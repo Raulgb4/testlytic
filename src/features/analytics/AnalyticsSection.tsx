@@ -27,20 +27,19 @@ export function AnalyticsSection({
     ...Array.from(new Set(answerHistory.map((row) => row.topic))).sort(),
   ];
   const filteredRows = filterHistoryRows(answerHistory, searchQuery, topicFilter);
+  const tabItems = [
+    { id: "dashboard", label: t("analytics.tabDashboard") },
+    { id: "history", label: t("analytics.tabHistory") },
+  ] satisfies { id: AnalyticsTab; label: string }[];
 
   if (analyticsTab === "history") {
     return (
-      <div className="view-grid">
-        <Card title={t("analytics.title")} subtitle={t("analytics.historySubtitle")}>
-          <Tabs
-            items={[
-              { id: "dashboard", label: t("analytics.tabDashboard") },
-              { id: "history", label: t("analytics.tabHistory") },
-            ]}
-            active={analyticsTab}
-            onChange={setAnalyticsTab}
-          />
+      <div className="view-grid analytics-view">
+        <section className="analytics-tabs-card" aria-label={t("analytics.title")}>
+          <Tabs items={tabItems} active={analyticsTab} onChange={setAnalyticsTab} />
+        </section>
 
+        <Card title={t("analytics.title")} subtitle={t("analytics.historySubtitle")}>
           <div className="history-toolbar">
             <input
               className="input"
@@ -112,17 +111,12 @@ export function AnalyticsSection({
   }
 
   return (
-    <div className="view-grid">
-      <Card title={t("analytics.title")} subtitle={t("analytics.subtitle")}>
-        <Tabs
-          items={[
-            { id: "dashboard", label: t("analytics.tabDashboard") },
-            { id: "history", label: t("analytics.tabHistory") },
-          ]}
-          active={analyticsTab}
-          onChange={setAnalyticsTab}
-        />
+    <div className="view-grid analytics-view">
+      <section className="analytics-tabs-card" aria-label={t("analytics.title")}>
+        <Tabs items={tabItems} active={analyticsTab} onChange={setAnalyticsTab} />
+      </section>
 
+      <Card title={t("analytics.title")} subtitle={t("analytics.subtitle")}>
         <div className="kpi-grid">
           <MetricCard
             item={{

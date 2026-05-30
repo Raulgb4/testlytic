@@ -60,14 +60,20 @@ export function AppShell({
           </nav>
         </aside>
 
-        <main className="content-area">
-          <header className="content-header">
-            <div>
-              <h2>{activeItem ? t(activeItem.labelKey) : ""}</h2>
-              <p>{activeItem ? t(activeItem.captionKey) : ""}</p>
-            </div>
-            <span className="tag">{t("app.tag")}</span>
-          </header>
+        <main
+          className={
+            section === "analytics" ? "content-area analytics-content-area" : "content-area"
+          }
+        >
+          {section !== "analytics" ? (
+            <header className="content-header">
+              <div>
+                <h2>{activeItem ? t(activeItem.labelKey) : ""}</h2>
+                <p>{activeItem ? t(activeItem.captionKey) : ""}</p>
+              </div>
+              <span className="tag">{t("app.tag")}</span>
+            </header>
+          ) : null}
 
           {section === "test" ? <TestSection t={t} /> : null}
           {section === "analytics" ? (
