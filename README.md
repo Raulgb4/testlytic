@@ -16,10 +16,10 @@ Unlike online quiz platforms, Testlytic is designed as a personal productivity t
 
 Testlytic is built around four main pillars:
 
-* Import question banks
-* Organize questions
-* Practice tests
-* Analyze performance
+- Import question banks
+- Organize questions
+- Practice tests
+- Analyze performance
 
 The goal is to transform test-based learning into a measurable and structured process.
 
@@ -37,21 +37,21 @@ Questions are primarily imported from JSON files and stored locally in a SQLite 
 
 Each question may contain:
 
-* Question statement
-* Multiple answer options
-* Correct answer
-* Topic or category
-* Optional explanation
-* Optional difficulty level
-* Optional tags
+- Question statement
+- Multiple answer options
+- Correct answer
+- Topic or category
+- Optional explanation
+- Optional difficulty level
+- Optional tags
 
 Questions can be organized by:
 
-* Topic
-* Category
-* Difficulty
-* Tags
-* Learning status
+- Topic
+- Category
+- Difficulty
+- Tags
+- Learning status
 
 ---
 
@@ -59,20 +59,20 @@ Questions can be organized by:
 
 Testlytic supports different study workflows:
 
-* Practice Mode
-* Exam Simulation Mode
-* Error Review Mode
-* Topic-Based Practice
-* Random Practice
+- Practice Mode
+- Exam Simulation Mode
+- Error Review Mode
+- Topic-Based Practice
+- Random Practice
 
 Users can configure:
 
-* Number of questions
-* Time limit
-* Negative marking
-* Unanswered questions
-* Topic selection
-* Random order
+- Number of questions
+- Time limit
+- Negative marking
+- Unanswered questions
+- Topic selection
+- Random order
 
 ---
 
@@ -80,16 +80,16 @@ Users can configure:
 
 Each completed test stores information such as:
 
-* Title
-* Date
-* Category
-* Number of questions
-* Time spent
-* Correct answers
-* Incorrect answers
-* Unanswered questions
-* Final score
-* Average score
+- Title
+- Date
+- Category
+- Number of questions
+- Time spent
+- Correct answers
+- Incorrect answers
+- Unanswered questions
+- Final score
+- Average score
 
 This allows users to track progress over time.
 
@@ -101,13 +101,13 @@ One of the key goals of Testlytic is helping users identify strengths and weakne
 
 Analytics may include:
 
-* Overall average score
-* Performance trends
-* Weakest topics
-* Most frequently missed questions
-* Average completion time
-* Topic accuracy rates
-* Learning progress over time
+- Overall average score
+- Performance trends
+- Weakest topics
+- Most frequently missed questions
+- Average completion time
+- Topic accuracy rates
+- Learning progress over time
 
 The objective is to provide actionable insights rather than just displaying results.
 
@@ -117,19 +117,19 @@ The objective is to provide actionable insights rather than just displaying resu
 
 Testlytic follows a modern desktop-first approach:
 
-* Simple
-* Fast
-* Clean
-* Visual
-* User-friendly
+- Simple
+- Fast
+- Clean
+- Visual
+- User-friendly
 
 The interface prioritizes:
 
-* Easy navigation
-* Light and dark themes
-* Clear dashboards
-* Meaningful charts
-* Productive workflows
+- Easy navigation
+- Light and dark themes
+- Clear dashboards
+- Meaningful charts
+- Productive workflows
 
 The visual style is inspired by Chronolytic, focusing on clarity and usability.
 
@@ -139,12 +139,12 @@ The visual style is inspired by Chronolytic, focusing on clarity and usability.
 
 The first release focuses on the essential features:
 
-* Question import
-* Question management
-* Test generation
-* Test execution
-* Results review
-* Basic analytics
+- Question import
+- Question management
+- Test generation
+- Test execution
+- Results review
+- Basic analytics
 
 Advanced functionality will be added in future releases.
 
@@ -154,17 +154,17 @@ Advanced functionality will be added in future releases.
 
 ### Frontend
 
-* React
-* TypeScript
-* Tailwind CSS
+- React
+- TypeScript
+- Tailwind CSS
 
 ### Desktop Framework
 
-* Tauri
+- Tauri
 
 ### Database
 
-* SQLite
+- SQLite
 
 ### Data Flow
 
@@ -178,14 +178,14 @@ JSON → Validation → SQLite → Tests → Analytics
 
 Planned core modules:
 
-* Dashboard
-* Question Importer
-* Question Manager
-* Test Generator
-* Test Session
-* Results Viewer
-* History
-* Analytics
+- Dashboard
+- Question Importer
+- Question Manager
+- Test Generator
+- Test Session
+- Results Viewer
+- History
+- Analytics
 
 ---
 
@@ -193,11 +193,11 @@ Planned core modules:
 
 The project prioritizes:
 
-* Rapid iteration
-* Clean architecture
-* Maintainability
-* Practical usefulness
-* Minimal complexity
+- Rapid iteration
+- Clean architecture
+- Maintainability
+- Practical usefulness
+- Minimal complexity
 
 The focus is on building a reliable and useful application rather than an overly feature-rich platform.
 

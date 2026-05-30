@@ -8,12 +8,12 @@ Testlytic is a local-first desktop application for practicing and analyzing mult
 
 The project prioritizes:
 
-* Simplicity
-* Maintainability
-* Performance
-* Clean architecture
-* Practical usefulness
-* Data-driven learning analytics
+- Simplicity
+- Maintainability
+- Performance
+- Clean architecture
+- Practical usefulness
+- Data-driven learning analytics
 
 Contributors should favor small, focused improvements over large, complex changes.
 
@@ -21,9 +21,9 @@ Contributors should favor small, focused improvements over large, complex change
 
 ## Prerequisites
 
-* Node.js 22+
-* pnpm
-* Rust toolchain (required for Tauri development and builds)
+- Node.js 22+
+- pnpm
+- Rust toolchain (required for Tauri development and builds)
 
 Verify your environment:
 
@@ -66,12 +66,12 @@ main
 
 ### Branch Purpose
 
-* `main`: production-ready releases
-* `develop`: integration branch
-* `feature/*`: new functionality
-* `fix/*`: bug fixes
-* `refactor/*`: internal improvements
-* `chore/*`: maintenance and tooling
+- `main`: production-ready releases
+- `develop`: integration branch
+- `feature/*`: new functionality
+- `fix/*`: bug fixes
+- `refactor/*`: internal improvements
+- `chore/*`: maintenance and tooling
 
 ### Commit Messages
 
@@ -115,21 +115,21 @@ The application should start without errors.
 
 ### Unit Testing
 
-* Use Vitest.
-* Keep tests colocated using `*.test.ts`.
-* Prioritize testing business logic.
-* Prefer pure functions whenever possible.
+- Use Vitest.
+- Keep tests colocated using `*.test.ts`.
+- Prioritize testing business logic.
+- Prefer pure functions whenever possible.
 
 ### What Should Be Tested
 
 Examples:
 
-* score calculations
-* negative marking rules
-* analytics calculations
-* question validation
-* import processing
-* statistics aggregation
+- score calculations
+- negative marking rules
+- analytics calculations
+- question validation
+- import processing
+- statistics aggregation
 
 ### What Should Not Be Tested First
 
@@ -148,9 +148,7 @@ Keep business rules outside React components.
 Avoid:
 
 ```tsx
-<QuestionResults
-  score={calculateScore(answers, settings)}
-/>
+<QuestionResults score={calculateScore(answers, settings)} />
 ```
 
 Prefer:
@@ -171,18 +169,18 @@ UI components should never execute SQL directly.
 
 Analytics calculations should be:
 
-* pure
-* reusable
-* deterministic
-* unit-testable
+- pure
+- reusable
+- deterministic
+- unit-testable
 
 ### Components
 
 Prefer:
 
-* small components
-* composable components
-* reusable components
+- small components
+- composable components
+- reusable components
 
 Avoid large monolithic screens.
 
@@ -206,10 +204,10 @@ JSON → Validation → SQLite → Tests → Analytics
 
 ### Data Integrity
 
-* Never import invalid questions.
-* Preserve user history whenever possible.
-* Prefer additive schema evolution.
-* Avoid destructive migrations.
+- Never import invalid questions.
+- Preserve user history whenever possible.
+- Prefer additive schema evolution.
+- Avoid destructive migrations.
 
 ---
 
@@ -219,16 +217,16 @@ Questions are primarily imported rather than manually authored.
 
 A valid question should contain:
 
-* statement
-* answer options
-* correct answer
-* topic or category
+- statement
+- answer options
+- correct answer
+- topic or category
 
 Optional fields may include:
 
-* explanation
-* tags
-* difficulty
+- explanation
+- tags
+- difficulty
 
 Validation should happen before persistence.
 
@@ -242,10 +240,10 @@ Historical results must remain immutable.
 
 When implementing analytics:
 
-* prioritize clarity
-* avoid misleading metrics
-* keep calculations transparent
-* prefer understandable insights over excessive complexity
+- prioritize clarity
+- avoid misleading metrics
+- keep calculations transparent
+- prefer understandable insights over excessive complexity
 
 ---
 
@@ -257,10 +255,10 @@ Do not document features that have not been implemented.
 
 Keep the following documents updated when relevant:
 
-* README.md
-* DESIGN.md
-* AGENTS.md
-* CONTRIBUTING.md
+- README.md
+- DESIGN.md
+- AGENTS.md
+- CONTRIBUTING.md
 
 ---
 
@@ -268,9 +266,9 @@ Keep the following documents updated when relevant:
 
 If the application introduces localization:
 
-* add strings to all supported languages
-* keep translation keys consistent
-* avoid hardcoded user-facing strings
+- add strings to all supported languages
+- keep translation keys consistent
+- avoid hardcoded user-facing strings
 
 ---
 
@@ -301,11 +299,11 @@ must remain committed.
 
 Before opening a pull request:
 
-* ensure CI passes
-* keep scope limited
-* update documentation if needed
-* include tests when business logic changes
-* verify desktop runtime behavior
+- ensure CI passes
+- keep scope limited
+- update documentation if needed
+- include tests when business logic changes
+- verify desktop runtime behavior
 
 Prefer multiple small pull requests over large feature dumps.
 
@@ -315,8 +313,8 @@ Prefer multiple small pull requests over large feature dumps.
 
 See:
 
-* `README.md` for project overview
-* `DESIGN.md` for product and UX principles
-* `AGENTS.md` for repository-specific engineering constraints
+- `README.md` for project overview
+- `DESIGN.md` for product and UX principles
+- `AGENTS.md` for repository-specific engineering constraints
 
 When unsure, choose the simpler solution.
