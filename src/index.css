@@ -34,11 +34,15 @@ body {
   --accent-soft: rgb(249 115 22 / 0.18);
   --ring: rgb(249 115 22 / 0.55);
   --danger: #ef4444;
+  --scrollbar-track: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  --scrollbar-thumb: color-mix(in srgb, var(--text-muted) 58%, var(--surface-2));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 34%, var(--text-muted));
+  --scrollbar-corner: color-mix(in srgb, var(--surface) 88%, transparent);
 
   min-height: 100vh;
   background: radial-gradient(circle at 16% -8%, #1f2635 0%, var(--bg) 55%);
   color: var(--text);
-  --header-height: 82px;
+  --header-height: 112px;
   min-width: 1200px;
 }
 
@@ -56,6 +60,10 @@ body {
   --accent-soft: rgb(249 115 22 / 0.14);
   --ring: rgb(249 115 22 / 0.45);
   --danger: #dc2626;
+  --scrollbar-track: color-mix(in srgb, var(--surface-2) 86%, transparent);
+  --scrollbar-thumb: color-mix(in srgb, var(--text-muted) 52%, var(--surface-2));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 32%, var(--text-muted));
+  --scrollbar-corner: color-mix(in srgb, var(--surface) 90%, transparent);
 
   background: radial-gradient(circle at 16% -8%, #ffe7cf 0%, var(--bg) 62%);
 }
@@ -66,34 +74,53 @@ body {
   background: color-mix(in srgb, var(--bg-elevated) 95%, transparent);
   display: flex;
   align-items: center;
-  padding: 0 26px;
+  padding: 6px 24px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--scrollbar-corner);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  margin-left: -10px;
 }
 
 .brand-logo {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border));
-  background: color-mix(in srgb, var(--accent-soft) 60%, transparent);
-}
-
-.brand-name {
-  margin: 0;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: var(--text);
-}
-
-.brand-subtitle {
-  margin: 0;
-  font-size: 0.86rem;
-  color: var(--text-muted);
+  width: 364px;
+  height: 86px;
+  max-width: none;
+  display: block;
+  object-fit: cover;
+  object-position: center;
 }
 
 .workspace {

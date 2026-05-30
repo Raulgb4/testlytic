@@ -1,4 +1,4 @@
-import appLogo from "../../src-tauri/icons/32x32.png";
+import appLogo from "../assets/logo/NEW LOGO.png";
 import { AnalyticsSection } from "../features/analytics/AnalyticsSection";
 import { MockAnswerHistoryRow, MockCompletedAttempt } from "../features/analytics/analyticsTypes";
 import { SettingsSection } from "../features/settings/SettingsSection";
@@ -42,10 +42,6 @@ export function AppShell({
       <header className="topbar">
         <div className="brand">
           <img src={appLogo} alt={`${t("app.name")} logo`} className="brand-logo" />
-          <div>
-            <p className="brand-name">{t("app.name")}</p>
-            <p className="brand-subtitle">{t("app.subtitle")}</p>
-          </div>
         </div>
       </header>
 
