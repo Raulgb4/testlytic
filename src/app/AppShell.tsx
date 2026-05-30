@@ -39,17 +39,18 @@ export function AppShell({
 
   return (
     <div className="app-shell" data-theme={theme}>
+      <header className="topbar">
+        <div className="brand">
+          <img src={appLogo} alt={`${t("app.name")} logo`} className="brand-logo" />
+          <div>
+            <p className="brand-name">{t("app.name")}</p>
+            <p className="brand-subtitle">{t("app.subtitle")}</p>
+          </div>
+        </div>
+      </header>
+
       <div className="workspace">
         <aside className="sidebar">
-          <div className="sidebar-brand">
-            <img src={appLogo} alt={`${t("app.name")} logo`} className="brand-logo" />
-            <div>
-              <p className="brand-name">{t("app.name")}</p>
-              <p className="brand-subtitle">{t("app.subtitle")}</p>
-            </div>
-          </div>
-          <div className="sidebar-divider" aria-hidden="true" />
-
           <nav className="nav-list" aria-label="Primary">
             {NAV_ITEMS.map((item) => (
               <NavItem
