@@ -1,13 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Translator } from "../../app/types";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
 import { MetricCard } from "../../shared/components/MetricCard";
+import { Toast } from "../../shared/components/Toast";
 import { toFixed } from "../../shared/utils/format";
 import { DEFAULT_TEST_CONFIG } from "./mockQuestions";
 import { QuestionCollectionOnboarding } from "./QuestionCollectionOnboarding";
 import { QuestionCollectionSummary } from "./QuestionCollectionSummary";
-import { downloadQuestionCollectionTemplate } from "./questionCollectionTemplate";
+import { saveQuestionCollectionTemplate } from "./questionCollectionTemplate";
 import {
   mapCollectionToSessionQuestions,
   QuestionCollection,
@@ -28,6 +29,13 @@ export function TestSection({ t }: { t: Translator }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [result, setResult] = useState<TestResult | null>(null);
   const [finishWarning, setFinishWarning] = useState("");
+  const [toast, setToast] = useState<null | { message: string; variant: "success" | "error" }>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const availableQuestions = useMemo(
     () => (collection ? mapCollectionToSessionQuestions(collection) : []),
@@ -90,14 +98,35 @@ export function TestSection({ t }: { t: Translator }) {
     });
   };
 
+  const handleDownloadTemplate = async () => {
+    const result = await saveQuestionCollectionTemplate();
+    if (result.status === "saved") {
+      setToast({ message: t("test.templateSavedSuccess"), variant: "success" });
+      return;
+    }
+    if (result.status === "error") {
+      setToast({ message: t("test.templateSavedError"), variant: "error" });
+    }
+  };
+
   if (!collection) {
     return (
-      <QuestionCollectionOnboarding
-        t={t}
-        errors={validationErrors}
-        onDownloadTemplate={downloadQuestionCollectionTemplate}
-        onImportFile={importCollectionFile}
-      />
+      <>
+        <QuestionCollectionOnboarding
+          t={t}
+          errors={validationErrors}
+          onDownloadTemplate={handleDownloadTemplate}
+          onImportFile={importCollectionFile}
+        />
+        {toast ? (
+          <Toast
+            message={toast.message}
+            variant={toast.variant}
+            onClose={() => setToast(null)}
+            closeLabel={t("test.toastClose")}
+          />
+        ) : null}
+      </>
     );
   }
 

@@ -11,7 +11,7 @@ export function QuestionCollectionOnboarding({
 }: {
   t: Translator;
   errors: ValidationIssue[];
-  onDownloadTemplate: () => void;
+  onDownloadTemplate: () => void | Promise<void>;
   onImportFile: (file: File) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -25,47 +25,54 @@ export function QuestionCollectionOnboarding({
         <h3 id="collection-onboarding-title">{t("test.collectionOnboardingTitle")}</h3>
         <p className="placeholder-note">{t("test.collectionOnboardingSubtitle")}</p>
 
-        <div className="card-actions">
-          <Button variant="secondary" onClick={onDownloadTemplate}>
-            {t("test.downloadTemplate")}
-          </Button>
-          <Button onClick={() => inputRef.current?.click()}>{t("test.importCollection")}</Button>
-        </div>
-
-        <input
-          id={inputId}
-          ref={inputRef}
-          className="collection-file-input"
-          type="file"
-          accept="application/json,.json"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) onImportFile(file);
-            event.currentTarget.value = "";
-          }}
-        />
-
-        {hasErrors ? (
-          <div className="collection-errors" role="alert" aria-live="polite">
-            <p className="collection-errors-title">{t("test.importErrorsTitle")}</p>
-            <ul className="collection-errors-list">
-              {visibleErrors.map((error) => (
-                <li key={`${error.path}-${error.message}`}>
-                  <strong>{error.path}</strong>: {error.message}
-                </li>
-              ))}
-            </ul>
-            {errors.length > visibleErrors.length ? (
-              <p className="collection-errors-more">
-                {t("test.importErrorsMore", {
-                  shown: visibleErrors.length,
-                  total: errors.length,
-                })}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
+        <ol className="collection-workflow">
+          <li>{t("test.collectionWorkflowStep1")}</li>
+          <li>{t("test.collectionWorkflowStep2")}</li>
+          <li>{t("test.collectionWorkflowStep3")}</li>
+          <li>{t("test.collectionWorkflowStep4")}</li>
+        </ol>
       </section>
+
+      <div className="collection-actions" aria-label={t("test.collectionActionsLabel")}>
+        <Button variant="secondary" onClick={() => void onDownloadTemplate()}>
+          {t("test.downloadTemplate")}
+        </Button>
+        <Button onClick={() => inputRef.current?.click()}>{t("test.importCollection")}</Button>
+      </div>
+
+      <input
+        id={inputId}
+        ref={inputRef}
+        className="collection-file-input"
+        type="file"
+        accept="application/json,.json"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) onImportFile(file);
+          event.currentTarget.value = "";
+        }}
+      />
+
+      {hasErrors ? (
+        <div className="collection-errors" role="alert" aria-live="polite">
+          <p className="collection-errors-title">{t("test.importErrorsTitle")}</p>
+          <ul className="collection-errors-list">
+            {visibleErrors.map((error) => (
+              <li key={`${error.path}-${error.message}`}>
+                <strong>{error.path}</strong>: {error.message}
+              </li>
+            ))}
+          </ul>
+          {errors.length > visibleErrors.length ? (
+            <p className="collection-errors-more">
+              {t("test.importErrorsMore", {
+                shown: visibleErrors.length,
+                total: errors.length,
+              })}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
