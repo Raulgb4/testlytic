@@ -479,6 +479,63 @@ body {
   line-height: 1.45;
 }
 
+.collection-onboarding-wrap {
+  min-height: calc(100vh - var(--header-height) - 44px);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.collection-onboarding-card {
+  width: min(760px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 95%, transparent);
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.collection-onboarding-card h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.collection-file-input {
+  display: none;
+}
+
+.collection-errors {
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.collection-errors-title {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.collection-errors-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.collection-errors-more {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
 .bank-summary,
 .form-grid {
   display: grid;

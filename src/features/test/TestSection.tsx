@@ -1,24 +1,41 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Translator } from "../../app/types";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
 import { MetricCard } from "../../shared/components/MetricCard";
 import { toFixed } from "../../shared/utils/format";
-import { DEFAULT_TEST_CONFIG, MOCK_QUESTIONS } from "./mockQuestions";
+import { DEFAULT_TEST_CONFIG } from "./mockQuestions";
+import { QuestionCollectionOnboarding } from "./QuestionCollectionOnboarding";
+import { QuestionCollectionSummary } from "./QuestionCollectionSummary";
+import { downloadQuestionCollectionTemplate } from "./questionCollectionTemplate";
+import {
+  mapCollectionToSessionQuestions,
+  QuestionCollection,
+  ValidationIssue,
+} from "./questionCollectionTypes";
+import { validateQuestionCollectionJson } from "./questionCollectionValidation";
 import { MockQuestion, TestConfig, TestFlowStatus, TestResult } from "./testTypes";
 import { buildTopicCategories, calculateResults, getFilteredQuestions } from "./testUtils";
 
 export function TestSection({ t }: { t: Translator }) {
+  const allTopicsLabel = t("test.allTopics");
   const [status, setStatus] = useState<TestFlowStatus>("landing");
   const [config, setConfig] = useState<TestConfig>(DEFAULT_TEST_CONFIG);
+  const [collection, setCollection] = useState<QuestionCollection | null>(null);
+  const [validationErrors, setValidationErrors] = useState<ValidationIssue[]>([]);
   const [questions, setQuestions] = useState<MockQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string | null>>({});
   const [currentIndex, setCurrentIndex] = useState(0);
   const [result, setResult] = useState<TestResult | null>(null);
   const [finishWarning, setFinishWarning] = useState("");
 
+  const availableQuestions = useMemo(
+    () => (collection ? mapCollectionToSessionQuestions(collection) : []),
+    [collection],
+  );
+
   const beginSession = (nextConfig: TestConfig) => {
-    const sessionQuestions = getFilteredQuestions(nextConfig);
+    const sessionQuestions = getFilteredQuestions(nextConfig, availableQuestions, allTopicsLabel);
     const initialAnswers: Record<string, string | null> = {};
     for (const question of sessionQuestions) {
       initialAnswers[question.id] = null;
@@ -32,7 +49,6 @@ export function TestSection({ t }: { t: Translator }) {
     setStatus("active");
   };
 
-  const handleQuickStart = () => beginSession(DEFAULT_TEST_CONFIG);
   const handleStartFromConfig = () => beginSession(config);
 
   const setAnswer = (questionId: string, optionId: string) => {
@@ -56,18 +72,51 @@ export function TestSection({ t }: { t: Translator }) {
     setStatus("results");
   };
 
+  const importCollectionFile = async (file: File) => {
+    const raw = await file.text();
+    const validation = validateQuestionCollectionJson(raw);
+    if (!validation.ok) {
+      setValidationErrors(validation.errors);
+      return;
+    }
+
+    setCollection(validation.collection);
+    setValidationErrors([]);
+    setStatus("landing");
+    setConfig({
+      ...DEFAULT_TEST_CONFIG,
+      topicCategory: allTopicsLabel,
+      questionCount: Math.min(DEFAULT_TEST_CONFIG.questionCount, validation.collection.summary.totalQuestions),
+    });
+  };
+
+  if (!collection) {
+    return (
+      <QuestionCollectionOnboarding
+        t={t}
+        errors={validationErrors}
+        onDownloadTemplate={downloadQuestionCollectionTemplate}
+        onImportFile={importCollectionFile}
+      />
+    );
+  }
+
   if (status === "configure") {
-    const availableForCategory = getFilteredQuestions({
-      ...config,
-      questionCount: MOCK_QUESTIONS.length,
-    }).length;
+    const availableForCategory = getFilteredQuestions(
+      {
+        ...config,
+        questionCount: availableQuestions.length,
+      },
+      availableQuestions,
+      allTopicsLabel,
+    ).length;
 
     const titleError = config.title.trim().length === 0;
     const countError = config.questionCount < 1 || config.questionCount > availableForCategory;
     const timeError = config.timeLimitMinutes < 0;
     const isValid = !titleError && !countError && !timeError;
 
-    const topicOptions = buildTopicCategories(t("test.allTopics"), MOCK_QUESTIONS);
+    const topicOptions = buildTopicCategories(allTopicsLabel, availableQuestions);
 
     const update = <K extends keyof TestConfig>(key: K, value: TestConfig[K]) => {
       setConfig({ ...config, [key]: value });
@@ -129,9 +178,7 @@ export function TestSection({ t }: { t: Translator }) {
                 value={config.timeLimitMinutes}
                 onChange={(event) => update("timeLimitMinutes", Number(event.target.value || 0))}
               />
-              {timeError ? (
-                <small className="field-error">{t("test.timeNonNegative")}</small>
-              ) : null}
+              {timeError ? <small className="field-error">{t("test.timeNonNegative")}</small> : null}
             </label>
 
             <label className="field field-inline">
@@ -152,9 +199,7 @@ export function TestSection({ t }: { t: Translator }) {
                 step={0.05}
                 disabled={!config.negativeMarking}
                 value={config.negativeMarkingValue}
-                onChange={(event) =>
-                  update("negativeMarkingValue", Number(event.target.value || 0))
-                }
+                onChange={(event) => update("negativeMarkingValue", Number(event.target.value || 0))}
               />
             </label>
 
@@ -334,13 +379,10 @@ export function TestSection({ t }: { t: Translator }) {
                   </p>
                   <p className="review-line">
                     {t("test.selected")}:{" "}
-                    {selected
-                      ? `${selected.toUpperCase()} · ${selectedText}`
-                      : t("test.unansweredText")}
+                    {selected ? `${selected.toUpperCase()} · ${selectedText}` : t("test.unansweredText")}
                   </p>
                   <p className="review-line">
-                    {t("test.correctAnswer")}: {question.correctOptionId.toUpperCase()} ·{" "}
-                    {correctText}
+                    {t("test.correctAnswer")}: {question.correctOptionId.toUpperCase()} · {correctText}
                   </p>
                   <p className="review-note">
                     {t("test.explanation")}: {question.explanation}
@@ -367,44 +409,5 @@ export function TestSection({ t }: { t: Translator }) {
     );
   }
 
-  const categories = buildTopicCategories(t("test.allTopics"), MOCK_QUESTIONS);
-
-  return (
-    <div className="view-grid">
-      <Card title={t("test.quickStartTitle")} subtitle={t("test.quickStartSubtitle")}>
-        <div className="card-actions">
-          <Button onClick={handleQuickStart}>{t("test.startMock")}</Button>
-          <Button variant="secondary" onClick={() => setStatus("configure")}>
-            {t("test.configure")}
-          </Button>
-        </div>
-      </Card>
-
-      <Card title={t("test.mockBankTitle")} subtitle={t("test.mockBankSubtitle")}>
-        <div className="bank-summary">
-          <div className="metric-inline">
-            <span className="metric-inline-label">{t("test.questions")}</span>
-            <span className="metric-inline-value">{MOCK_QUESTIONS.length}</span>
-          </div>
-          <div className="metric-inline">
-            <span className="metric-inline-label">{t("test.topicCategories")}</span>
-            <span className="metric-inline-value">{categories.length - 1}</span>
-          </div>
-        </div>
-      </Card>
-
-      <Card title={t("test.jsonTitle")} subtitle={t("test.jsonSubtitle")}>
-        <p className="placeholder-note">{t("test.jsonNote")}</p>
-      </Card>
-
-      <Card title={t("test.modesTitle")} subtitle={t("test.modesSubtitle")}>
-        <div className="mode-grid">
-          <div className="pill">{t("test.modePractice")}</div>
-          <div className="pill">{t("test.modeExam")}</div>
-          <div className="pill">{t("test.modeError")}</div>
-          <div className="pill">{t("test.modeTopic")}</div>
-        </div>
-      </Card>
-    </div>
-  );
+  return <QuestionCollectionSummary t={t} collection={collection} onConfigure={() => setStatus("configure")} />;
 }

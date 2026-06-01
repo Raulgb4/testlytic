@@ -75,7 +75,19 @@
     "unansweredText": "Unanswered",
     "explanation": "Explanation",
     "startAnother": "Start Another Mock Test",
-    "backHome": "Back Home"
+    "backHome": "Back Home",
+    "collectionOnboardingTitle": "Import your question collection",
+    "collectionOnboardingSubtitle": "Download the JSON template, complete it, and import your validated question bank to begin.",
+    "downloadTemplate": "Download JSON Template",
+    "importCollection": "Import Question Collection",
+    "importErrorsTitle": "Import failed. Fix the following issues and try again.",
+    "importErrorsMore": "Showing {shown} of {total} validation issues.",
+    "collectionSummaryTitle": "Question Bank Summary",
+    "collectionSummarySubtitle": "Valid collection imported. Configure your next test session.",
+    "collectionSubcategories": "Subcategories",
+    "collectionSingleChoice": "Single-choice",
+    "collectionMultipleChoice": "Multiple-choice",
+    "collectionSources": "Sources"
   },
   "analytics": {
     "title": "Analytics",

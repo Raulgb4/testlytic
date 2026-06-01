@@ -1,4 +1,3 @@
-import { MOCK_QUESTIONS } from "./mockQuestions";
 import { MockQuestion, TestConfig, TestResult } from "./testTypes";
 
 export function formatTopicCategory(question: MockQuestion) {
@@ -9,11 +8,19 @@ export function buildTopicCategories(allTopicsLabel: string, questions: MockQues
   return [allTopicsLabel, ...Array.from(new Set(questions.map(formatTopicCategory))).sort()];
 }
 
-export function getFilteredQuestions(config: TestConfig) {
-  const base =
-    config.topicCategory === "All Topics"
-      ? MOCK_QUESTIONS
-      : MOCK_QUESTIONS.filter((question) => formatTopicCategory(question) === config.topicCategory);
+export function getFilteredQuestions(
+  config: TestConfig,
+  questions: MockQuestion[],
+  allTopicsLabel: string,
+) {
+  if (config.topicCategory === allTopicsLabel) {
+    return questions.slice(0, Math.min(config.questionCount, questions.length));
+  }
+
+  const filtered = questions.filter(
+    (question) => formatTopicCategory(question) === config.topicCategory,
+  );
+  const base = filtered.length > 0 ? filtered : questions;
   return base.slice(0, Math.min(config.questionCount, base.length));
 }
 

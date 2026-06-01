@@ -75,7 +75,19 @@
     "unansweredText": "Sin responder",
     "explanation": "Explicación",
     "startAnother": "Iniciar otra prueba de ejemplo",
-    "backHome": "Volver al inicio"
+    "backHome": "Volver al inicio",
+    "collectionOnboardingTitle": "Importa tu colección de preguntas",
+    "collectionOnboardingSubtitle": "Descarga la plantilla JSON, complétala e importa tu banco de preguntas validado para comenzar.",
+    "downloadTemplate": "Descargar plantilla JSON",
+    "importCollection": "Importar colección de preguntas",
+    "importErrorsTitle": "La importación falló. Corrige estos errores e inténtalo de nuevo.",
+    "importErrorsMore": "Mostrando {shown} de {total} errores de validación.",
+    "collectionSummaryTitle": "Resumen del banco de preguntas",
+    "collectionSummarySubtitle": "Colección válida importada. Configura tu próxima sesión de prueba.",
+    "collectionSubcategories": "Subcategorías",
+    "collectionSingleChoice": "Opción única",
+    "collectionMultipleChoice": "Opción múltiple",
+    "collectionSources": "Fuentes"
   },
   "analytics": {
     "title": "Analítica",
