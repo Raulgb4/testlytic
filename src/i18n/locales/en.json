@@ -133,7 +133,20 @@
     "rawScore": "rawScore",
     "finalScore": "finalScore",
     "accuracyPercentage": "accuracyPercentage",
-    "returnToHome": "Return to Test Home"
+    "returnToHome": "Return to Test Home",
+    "sectionBasics": "Basics",
+    "sectionFilters": "Question Filters",
+    "sectionTimingScoring": "Timing & Scoring",
+    "modalTitle": "Test Title",
+    "matchingCount": "Matching questions: {count}",
+    "searchCategories": "Search categories",
+    "searchSubcategories": "Search subcategories",
+    "selectedCount": "Selected: {count}",
+    "clearAll": "Clear all",
+    "selectCategoryFirst": "Select at least one category first.",
+    "fixFieldsBeforeSave": "Fix {count} field(s) before saving.",
+    "saveTest": "Save Test",
+    "close": "Close"
   },
   "analytics": {
     "title": "Analytics",

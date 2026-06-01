@@ -133,7 +133,20 @@
     "rawScore": "rawScore",
     "finalScore": "finalScore",
     "accuracyPercentage": "accuracyPercentage",
-    "returnToHome": "Volver al inicio de pruebas"
+    "returnToHome": "Volver al inicio de pruebas",
+    "sectionBasics": "Básicos",
+    "sectionFilters": "Filtros de preguntas",
+    "sectionTimingScoring": "Tiempo y puntuación",
+    "modalTitle": "Título de la prueba",
+    "matchingCount": "Preguntas coincidentes: {count}",
+    "searchCategories": "Buscar categorías",
+    "searchSubcategories": "Buscar subcategorías",
+    "selectedCount": "Seleccionadas: {count}",
+    "clearAll": "Limpiar todo",
+    "selectCategoryFirst": "Selecciona al menos una categoría primero.",
+    "fixFieldsBeforeSave": "Corrige {count} campo(s) antes de guardar.",
+    "saveTest": "Guardar prueba",
+    "close": "Cerrar"
   },
   "analytics": {
     "title": "Analítica",

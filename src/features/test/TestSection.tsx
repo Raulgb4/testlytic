@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { FormEvent, RefObject, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Translator } from "../../app/types";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
@@ -14,7 +14,6 @@ import { ActiveTestAttempt, RuntimeAnswer, RuntimeQuestion, TestAttempt, TestDef
 import { buildRuntimeQuestions, calculateAttemptResult, getCategoryOptions, getMatchingQuestions, getSubcategoryOptions } from "./testUtils";
 
 type TestFormState = {
-  id: string;
   title: string;
   questionLimit: number;
   includedCategories: string[];
@@ -26,7 +25,6 @@ type TestFormState = {
 };
 
 const INITIAL_FORM: TestFormState = {
-  id: "",
   title: "",
   questionLimit: 20,
   includedCategories: [],
@@ -47,6 +45,12 @@ export function TestSection({ t }: { t: Translator }) {
   const [formOpen, setFormOpen] = useState(false);
   const [formState, setFormState] = useState<TestFormState>(INITIAL_FORM);
   const [editingTestId, setEditingTestId] = useState<string | null>(null);
+  const [formTouched, setFormTouched] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const questionLimitInputRef = useRef<HTMLInputElement | null>(null);
+  const categoriesTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const timeLimitInputRef = useRef<HTMLInputElement | null>(null);
+  const penaltyInputRef = useRef<HTMLInputElement | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TestDefinition | null>(null);
   const [importMoreOpen, setImportMoreOpen] = useState(false);
   const [activeAttempt, setActiveAttempt] = useState<ActiveTestAttempt | null>(null);
@@ -117,6 +121,7 @@ export function TestSection({ t }: { t: Translator }) {
 
   const openCreate = () => {
     setEditingTestId(null);
+    setFormTouched(false);
     setFormState({
       ...INITIAL_FORM,
       questionLimit: Math.min(20, Math.max(1, bankQuestions.length)),
@@ -127,8 +132,8 @@ export function TestSection({ t }: { t: Translator }) {
 
   const openEdit = (definition: TestDefinition) => {
     setEditingTestId(definition.id);
+    setFormTouched(false);
     setFormState({
-      id: definition.id,
       title: definition.title,
       questionLimit: definition.questionLimit,
       includedCategories: definition.includedCategories,
@@ -141,14 +146,26 @@ export function TestSection({ t }: { t: Translator }) {
     setFormOpen(true);
   };
 
-  const formErrors = validateDefinitionForm(formState, definitions, editingTestId, bankQuestions);
+  const formValidation = validateDefinitionForm(formState, bankQuestions);
+  const showErrors = formTouched;
 
-  const saveDefinition = () => {
-    if (formErrors.length > 0) return;
+  const saveDefinition = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFormTouched(true);
+    if (formValidation.summary.length > 0) {
+      const firstError = formValidation.order.find((key) => Boolean(formValidation.errors[key]));
+      if (firstError === "title") titleInputRef.current?.focus();
+      if (firstError === "questionLimit") questionLimitInputRef.current?.focus();
+      if (firstError === "includedCategories") categoriesTriggerRef.current?.focus();
+      if (firstError === "timeLimitMinutes") timeLimitInputRef.current?.focus();
+      if (firstError === "penaltyPerIncorrectAnswer") penaltyInputRef.current?.focus();
+      return;
+    }
+
     const now = new Date().toISOString();
-    const normalizedId = formState.id.trim();
+    const generatedId = `test-${Date.now()}`;
     const payload: TestDefinition = {
-      id: normalizedId,
+      id: editingTestId || generatedId,
       title: formState.title.trim(),
       questionLimit: formState.questionLimit,
       includedCategories: formState.includedCategories,
@@ -390,44 +407,149 @@ export function TestSection({ t }: { t: Translator }) {
 
       {formOpen ? (
         <div className="settings-modal-backdrop" role="presentation">
-          <div className="settings-modal test-definition-modal" role="dialog" aria-modal="true">
-            <h3>{editingTestId ? t("test.editTest") : t("test.createTest")}</h3>
-            <div className="form-grid">
-              <label className="field"><span>{t("test.testId")}</span><input className="input" value={formState.id} onChange={(event) => setFormState({ ...formState, id: event.target.value })} disabled={Boolean(editingTestId)} /></label>
-              <label className="field"><span>{t("test.title")}</span><input className="input" value={formState.title} onChange={(event) => setFormState({ ...formState, title: event.target.value })} /></label>
-              <label className="field"><span>{t("test.questionLimit")}</span><input className="input" type="number" min={1} value={formState.questionLimit} onChange={(event) => setFormState({ ...formState, questionLimit: Number(event.target.value || 1) })} /></label>
-              <label className="field"><span>{t("test.timeLimit")}</span><input className="input" type="number" min={0} value={formState.timeLimitMinutes} onChange={(event) => setFormState({ ...formState, timeLimitMinutes: Number(event.target.value || 0) })} /></label>
-            </div>
-            <div className="category-picks">
-              <p className="modal-subtitle">{t("test.includedCategories")}</p>
-              <div className="chips-wrap">
-                {categoryOptions.map((category) => {
-                  const selected = formState.includedCategories.includes(category);
-                  return (
-                    <button key={category} type="button" className={selected ? "progress-chip current" : "progress-chip"} onClick={() => setFormState({ ...formState, includedCategories: selected ? formState.includedCategories.filter((item) => item !== category) : [...formState.includedCategories, category] })}>{category}</button>
-                  );
-                })}
+          <div className="settings-modal test-definition-modal" role="dialog" aria-modal="true" aria-labelledby="test-definition-title">
+            <h3 id="test-definition-title">{editingTestId ? t("test.editTest") : t("test.createTest")}</h3>
+            <form className="test-definition-form" onSubmit={saveDefinition} noValidate>
+              <div className="test-definition-body">
+                <section className="test-form-section">
+                  <h4>{t("test.sectionBasics")}</h4>
+                  <label className="field">
+                    <span>{t("test.modalTitle")}</span>
+                    <input
+                      ref={titleInputRef}
+                      className="input"
+                      value={formState.title}
+                      onChange={(event) => setFormState({ ...formState, title: event.target.value })}
+                      aria-invalid={showErrors && Boolean(formValidation.errors.title)}
+                    />
+                    {showErrors && formValidation.errors.title ? <small className="field-error">{formValidation.errors.title}</small> : null}
+                  </label>
+
+                  <label className="field">
+                    <span>{t("test.questionLimit")}</span>
+                    <input
+                      ref={questionLimitInputRef}
+                      className="input"
+                      type="number"
+                      min={1}
+                      value={formState.questionLimit}
+                      onChange={(event) => setFormState({ ...formState, questionLimit: Number(event.target.value || 1) })}
+                      aria-invalid={showErrors && Boolean(formValidation.errors.questionLimit)}
+                    />
+                    {showErrors && formValidation.errors.questionLimit ? <small className="field-error">{formValidation.errors.questionLimit}</small> : null}
+                    {formValidation.matchingCount > 0 ? (
+                      <small className="field-hint">{t("test.matchingCount", { count: formValidation.matchingCount })}</small>
+                    ) : null}
+                    {formValidation.limitWarning ? <small className="field-warning">{formValidation.limitWarning}</small> : null}
+                  </label>
+                </section>
+
+                <section className="test-form-section">
+                  <h4>{t("test.sectionFilters")}</h4>
+                  <SearchableMultiSelect
+                    label={t("test.includedCategories")}
+                    placeholder={t("test.searchCategories")}
+                    options={categoryOptions}
+                    selected={formState.includedCategories}
+                    onChange={(next) => {
+                      const allowedSubcategories = getSubcategoryOptions(bankQuestions, next);
+                      setFormState({
+                        ...formState,
+                        includedCategories: next,
+                        includedSubcategories: formState.includedSubcategories.filter((item) =>
+                          allowedSubcategories.includes(item),
+                        ),
+                      });
+                    }}
+                    triggerRef={categoriesTriggerRef}
+                    error={showErrors ? formValidation.errors.includedCategories : undefined}
+                    selectedCountLabel={t("test.selectedCount", { count: formState.includedCategories.length })}
+                    clearLabel={t("test.clearAll")}
+                    closeLabel={t("test.close")}
+                  />
+
+                  <SearchableMultiSelect
+                    label={t("test.includedSubcategoriesOptional")}
+                    placeholder={t("test.searchSubcategories")}
+                    options={subcategoryOptions}
+                    selected={formState.includedSubcategories}
+                    onChange={(next) => setFormState({ ...formState, includedSubcategories: next })}
+                    disabled={formState.includedCategories.length === 0}
+                    disabledText={t("test.selectCategoryFirst")}
+                    selectedCountLabel={t("test.selectedCount", { count: formState.includedSubcategories.length })}
+                    clearLabel={t("test.clearAll")}
+                    closeLabel={t("test.close")}
+                  />
+                </section>
+
+                <section className="test-form-section">
+                  <h4>{t("test.sectionTimingScoring")}</h4>
+                  <label className="field">
+                    <span>{t("test.timeLimit")}</span>
+                    <input
+                      ref={timeLimitInputRef}
+                      className="input"
+                      type="number"
+                      min={0}
+                      value={formState.timeLimitMinutes}
+                      onChange={(event) => setFormState({ ...formState, timeLimitMinutes: Number(event.target.value || 0) })}
+                      aria-invalid={showErrors && Boolean(formValidation.errors.timeLimitMinutes)}
+                    />
+                    {showErrors && formValidation.errors.timeLimitMinutes ? <small className="field-error">{formValidation.errors.timeLimitMinutes}</small> : null}
+                  </label>
+
+                  <label className="field-inline">
+                    <input
+                      type="checkbox"
+                      checked={formState.allowUnanswered}
+                      onChange={(event) => setFormState({ ...formState, allowUnanswered: event.target.checked })}
+                    />
+                    <span>{t("test.allowUnanswered")}</span>
+                  </label>
+
+                  <label className="field-inline">
+                    <input
+                      type="checkbox"
+                      checked={formState.negativeMarkingEnabled}
+                      onChange={(event) => setFormState({ ...formState, negativeMarkingEnabled: event.target.checked })}
+                    />
+                    <span>{t("test.negativeMarking")}</span>
+                  </label>
+
+                  <div className={formState.negativeMarkingEnabled ? "penalty-reveal show" : "penalty-reveal"}>
+                    <label className="field">
+                      <span>{t("test.penaltyPerIncorrectAnswer")}</span>
+                      <input
+                        ref={penaltyInputRef}
+                        className="input"
+                        type="number"
+                        min={0}
+                        step={0.05}
+                        value={formState.penaltyPerIncorrectAnswer}
+                        onChange={(event) => setFormState({ ...formState, penaltyPerIncorrectAnswer: Number(event.target.value || 0) })}
+                        aria-invalid={showErrors && Boolean(formValidation.errors.penaltyPerIncorrectAnswer)}
+                      />
+                      {showErrors && formValidation.errors.penaltyPerIncorrectAnswer ? <small className="field-error">{formValidation.errors.penaltyPerIncorrectAnswer}</small> : null}
+                    </label>
+                  </div>
+                </section>
               </div>
-              <p className="modal-subtitle">{t("test.includedSubcategoriesOptional")}</p>
-              <div className="chips-wrap">
-                {subcategoryOptions.map((subcategory) => {
-                  const selected = formState.includedSubcategories.includes(subcategory);
-                  return (
-                    <button key={subcategory} type="button" className={selected ? "progress-chip answered" : "progress-chip"} onClick={() => setFormState({ ...formState, includedSubcategories: selected ? formState.includedSubcategories.filter((item) => item !== subcategory) : [...formState.includedSubcategories, subcategory] })}>{subcategory}</button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="form-grid">
-              <label className="field-inline"><input type="checkbox" checked={formState.allowUnanswered} onChange={(event) => setFormState({ ...formState, allowUnanswered: event.target.checked })} /><span>{t("test.allowUnanswered")}</span></label>
-              <label className="field-inline"><input type="checkbox" checked={formState.negativeMarkingEnabled} onChange={(event) => setFormState({ ...formState, negativeMarkingEnabled: event.target.checked })} /><span>{t("test.negativeMarking")}</span></label>
-              <label className="field"><span>{t("test.penaltyPerIncorrectAnswer")}</span><input className="input" type="number" min={0} step={0.05} value={formState.penaltyPerIncorrectAnswer} disabled={!formState.negativeMarkingEnabled} onChange={(event) => setFormState({ ...formState, penaltyPerIncorrectAnswer: Number(event.target.value || 0) })} /></label>
-            </div>
-            {formErrors.length > 0 ? <p className="field-error">{formErrors[0]}</p> : null}
-            <div className="settings-modal-actions">
-              <Button onClick={saveDefinition} disabled={formErrors.length > 0}>{t("test.save")}</Button>
-              <Button variant="secondary" onClick={() => setFormOpen(false)}>{t("test.cancel")}</Button>
-            </div>
+
+              {showErrors && formValidation.summary.length > 0 ? (
+                <div className="form-error-summary" role="alert" aria-live="polite">
+                  <p>{t("test.fixFieldsBeforeSave", { count: formValidation.summary.length })}</p>
+                </div>
+              ) : null}
+
+              <footer className="test-definition-footer">
+                <button type="button" className="btn btn-secondary modal-action-btn" onClick={() => setFormOpen(false)}>
+                  {t("test.cancel")}
+                </button>
+                <button type="submit" className="btn btn-primary modal-action-btn">
+                  {t("test.saveTest")}
+                </button>
+              </footer>
+            </form>
           </div>
         </div>
       ) : null}
@@ -518,26 +640,25 @@ function MetricLine({ label, value }: { label: string; value: string }) {
 
 function validateDefinitionForm(
   form: TestFormState,
-  definitions: TestDefinition[],
-  editingTestId: string | null,
   bankQuestions: CollectionQuestion[],
 ) {
-  const errors: string[] = [];
-  if (!form.id.trim()) errors.push("ID is required.");
-  if (!editingTestId && definitions.some((item) => item.id === form.id.trim())) {
-    errors.push("ID must be unique.");
-  }
-  if (!form.title.trim()) errors.push("Title is required.");
+  const errors: Record<string, string> = {};
+  if (!form.title.trim()) errors.title = "Title is required.";
   if (!Number.isInteger(form.questionLimit) || form.questionLimit < 1) {
-    errors.push("Question limit must be at least 1.");
+    errors.questionLimit = "Question limit must be at least 1.";
   }
-  if (form.includedCategories.length === 0) errors.push("Select at least one category.");
-  if (form.timeLimitMinutes < 0) errors.push("Time limit cannot be negative.");
+  if (form.includedCategories.length === 0) {
+    errors.includedCategories = "Select at least one category.";
+  }
+  if (form.timeLimitMinutes < 0) {
+    errors.timeLimitMinutes = "Time limit cannot be negative.";
+  }
   if (form.negativeMarkingEnabled && form.penaltyPerIncorrectAnswer < 0) {
-    errors.push("Penalty cannot be negative.");
+    errors.penaltyPerIncorrectAnswer = "Penalty cannot be negative.";
   }
+
   const testDefinition: TestDefinition = {
-    id: form.id,
+    id: "temp-id",
     title: form.title,
     questionLimit: form.questionLimit,
     includedCategories: form.includedCategories,
@@ -550,6 +671,121 @@ function validateDefinitionForm(
     updatedAt: "",
   };
   const matchingCount = getMatchingQuestions(testDefinition, bankQuestions).length;
-  if (matchingCount < 1) errors.push("No questions match your filters.");
-  return errors;
+  if (matchingCount < 1) errors.includedCategories = "No questions match your filters.";
+
+  const summary = Object.values(errors);
+  const limitWarning =
+    matchingCount > 0 && form.questionLimit > matchingCount
+      ? `Only ${matchingCount} matching questions are currently available.`
+      : "";
+
+  return {
+    errors: {
+      title: errors.title,
+      questionLimit: errors.questionLimit,
+      includedCategories: errors.includedCategories,
+      timeLimitMinutes: errors.timeLimitMinutes,
+      penaltyPerIncorrectAnswer: errors.penaltyPerIncorrectAnswer,
+    },
+    summary,
+    matchingCount,
+    limitWarning,
+    order: [
+      "title",
+      "questionLimit",
+      "includedCategories",
+      "timeLimitMinutes",
+      "penaltyPerIncorrectAnswer",
+    ] as const,
+  };
+}
+
+function SearchableMultiSelect({
+  label,
+  placeholder,
+  options,
+  selected,
+  onChange,
+  selectedCountLabel,
+  clearLabel,
+  closeLabel,
+  disabled,
+  disabledText,
+  error,
+  triggerRef,
+}: {
+  label: string;
+  placeholder: string;
+  options: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  selectedCountLabel: string;
+  clearLabel: string;
+  closeLabel: string;
+  disabled?: boolean;
+  disabledText?: string;
+  error?: string;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const filtered = options.filter((item) => item.toLowerCase().includes(query.toLowerCase()));
+
+  const toggleSelection = (value: string) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter((item) => item !== value));
+      return;
+    }
+    onChange([...selected, value]);
+  };
+
+  return (
+    <div className="field multi-select-field">
+      <span>{label}</span>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="input multi-select-trigger"
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
+      >
+        {selected.length > 0 ? selectedCountLabel : placeholder}
+      </button>
+
+      {open && !disabled ? (
+        <div className="multi-select-panel">
+          <input
+            className="input multi-select-search"
+            value={query}
+            placeholder={placeholder}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <div className="multi-select-options">
+            {filtered.map((option) => (
+              <label key={option} className="multi-select-option">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(option)}
+                  onChange={() => toggleSelection(option)}
+                />
+                <span>{option}</span>
+              </label>
+            ))}
+          </div>
+          <div className="multi-select-actions">
+            <button type="button" className="btn btn-secondary" onClick={() => onChange([])}>
+              {clearLabel}
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
+              {closeLabel}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {disabled && disabledText ? <small className="field-hint">{disabledText}</small> : null}
+      {error ? <small className="field-error">{error}</small> : null}
+    </div>
+  );
 }
