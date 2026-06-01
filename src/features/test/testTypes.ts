@@ -3,32 +3,58 @@ export type QuestionOption = {
   text: string;
 };
 
-export type MockQuestion = {
+export type RuntimeQuestion = {
   id: string;
-  statement: string;
-  topic: string;
-  category: string;
+  question: string;
+  auxiliaryInformation?: string;
+  questionType: "single_choice" | "multiple_choice";
+  questionCategory: string;
+  questionSubcategory?: string;
   options: QuestionOption[];
-  correctOptionId: string;
-  explanation: string;
+  correctOptions: string[];
+  correctAnswerExplanation?: string;
 };
 
-export type TestFlowStatus = "landing" | "configure" | "active" | "results";
-
-export type TestConfig = {
+export type TestDefinition = {
+  id: string;
   title: string;
-  topicCategory: string;
-  questionCount: number;
-  timeLimitMinutes: number;
-  negativeMarking: boolean;
-  negativeMarkingValue: number;
+  questionLimit: number;
+  includedCategories: string[];
+  includedSubcategories?: string[];
   allowUnanswered: boolean;
+  negativeMarkingEnabled: boolean;
+  penaltyPerIncorrectAnswer: number;
+  timeLimitMinutes: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
-export type TestResult = {
-  total: number;
-  correct: number;
-  incorrect: number;
-  unanswered: number;
-  score: number;
+export type RuntimeAnswer = {
+  selectedOptionIds: string[];
+  isCorrect: boolean;
+  answeredAt: string;
+};
+
+export type ActiveTestAttempt = {
+  id: string;
+  testId: string;
+  startedAt: string;
+  questions: RuntimeQuestion[];
+  answers: Record<string, RuntimeAnswer | undefined>;
+  currentQuestionIndex: number;
+};
+
+export type TestAttempt = {
+  id: string;
+  testId: string;
+  startedAt: string;
+  completedAt: string;
+  durationSeconds: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  unansweredQuestions: number;
+  rawScore: number;
+  finalScore: number;
+  accuracyPercentage: number;
 };

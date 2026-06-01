@@ -1,57 +1,109 @@
-import { MockQuestion, TestConfig, TestResult } from "./testTypes";
+import { CollectionQuestion } from "./questionCollectionTypes";
+import { ActiveTestAttempt, RuntimeQuestion, TestAttempt, TestDefinition } from "./testTypes";
 
-export function formatTopicCategory(question: MockQuestion) {
-  return `${question.topic} / ${question.category}`;
-}
-
-export function buildTopicCategories(allTopicsLabel: string, questions: MockQuestion[]) {
-  return [allTopicsLabel, ...Array.from(new Set(questions.map(formatTopicCategory))).sort()];
-}
-
-export function getFilteredQuestions(
-  config: TestConfig,
-  questions: MockQuestion[],
-  allTopicsLabel: string,
-) {
-  if (config.topicCategory === allTopicsLabel) {
-    return questions.slice(0, Math.min(config.questionCount, questions.length));
+function shuffleArray<T>(items: T[]) {
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j], next[i]];
   }
-
-  const filtered = questions.filter(
-    (question) => formatTopicCategory(question) === config.topicCategory,
-  );
-  const base = filtered.length > 0 ? filtered : questions;
-  return base.slice(0, Math.min(config.questionCount, base.length));
+  return next;
 }
 
-export function calculateResults(
-  questions: MockQuestion[],
-  answers: Record<string, string | null>,
-  config: TestConfig,
-): TestResult {
-  let correct = 0;
-  let incorrect = 0;
-  let unanswered = 0;
+export function getCategoryOptions(questions: CollectionQuestion[]) {
+  return Array.from(new Set(questions.map((q) => q.questionCategory))).sort();
+}
+
+export function getSubcategoryOptions(questions: CollectionQuestion[], categories: string[]) {
+  const set = new Set<string>();
   for (const question of questions) {
-    const selected = answers[question.id];
-    if (!selected) {
-      unanswered += 1;
+    if (!categories.includes(question.questionCategory)) continue;
+    if (question.questionSubcategory) set.add(question.questionSubcategory);
+  }
+  return Array.from(set).sort();
+}
+
+export function getMatchingQuestions(definition: TestDefinition, bankQuestions: CollectionQuestion[]) {
+  const hasSubcategories = (definition.includedSubcategories || []).length > 0;
+  return bankQuestions.filter((question) => {
+    if (!definition.includedCategories.includes(question.questionCategory)) {
+      return false;
+    }
+    if (!hasSubcategories) {
+      return true;
+    }
+    return Boolean(
+      question.questionSubcategory &&
+        definition.includedSubcategories?.includes(question.questionSubcategory),
+    );
+  });
+}
+
+export function buildRuntimeQuestions(definition: TestDefinition, bankQuestions: CollectionQuestion[]) {
+  const matching = getMatchingQuestions(definition, bankQuestions);
+  const limited = shuffleArray(matching).slice(0, Math.min(definition.questionLimit, matching.length));
+  return limited.map<RuntimeQuestion>((question) => ({
+    id: question.id,
+    question: question.question,
+    auxiliaryInformation: question.auxiliaryInformation,
+    questionType: question.questionType,
+    questionCategory: question.questionCategory,
+    questionSubcategory: question.questionSubcategory,
+    options: shuffleArray(question.options),
+    correctOptions: question.correctOptions,
+    correctAnswerExplanation: question.correctAnswerExplanation,
+  }));
+}
+
+function isExactSetMatch(selectedOptionIds: string[], correctOptions: string[]) {
+  if (selectedOptionIds.length !== correctOptions.length) return false;
+  const selectedSet = new Set(selectedOptionIds);
+  return correctOptions.every((optionId) => selectedSet.has(optionId));
+}
+
+export function calculateAttemptResult(
+  activeAttempt: ActiveTestAttempt,
+  definition: TestDefinition,
+): TestAttempt {
+  let correctAnswers = 0;
+  let incorrectAnswers = 0;
+  let unansweredQuestions = 0;
+
+  for (const question of activeAttempt.questions) {
+    const answer = activeAttempt.answers[question.id];
+    if (!answer || answer.selectedOptionIds.length === 0) {
+      unansweredQuestions += 1;
       continue;
     }
-    if (selected === question.correctOptionId) {
-      correct += 1;
+    if (isExactSetMatch(answer.selectedOptionIds, question.correctOptions)) {
+      correctAnswers += 1;
     } else {
-      incorrect += 1;
+      incorrectAnswers += 1;
     }
   }
 
-  const score = correct - (config.negativeMarking ? incorrect * config.negativeMarkingValue : 0);
+  const completedAtIso = new Date().toISOString();
+  const startedAtMs = new Date(activeAttempt.startedAt).getTime();
+  const completedAtMs = new Date(completedAtIso).getTime();
+  const rawScore = correctAnswers;
+  const finalScore = definition.negativeMarkingEnabled
+    ? correctAnswers - incorrectAnswers * definition.penaltyPerIncorrectAnswer
+    : correctAnswers;
+  const totalQuestions = activeAttempt.questions.length;
+  const accuracyPercentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
 
   return {
-    total: questions.length,
-    correct,
-    incorrect,
-    unanswered,
-    score,
+    id: `attempt-${Date.now()}`,
+    testId: activeAttempt.testId,
+    startedAt: activeAttempt.startedAt,
+    completedAt: completedAtIso,
+    durationSeconds: Math.max(0, Math.floor((completedAtMs - startedAtMs) / 1000)),
+    totalQuestions,
+    correctAnswers,
+    incorrectAnswers,
+    unansweredQuestions,
+    rawScore,
+    finalScore,
+    accuracyPercentage,
   };
 }

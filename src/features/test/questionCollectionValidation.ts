@@ -25,7 +25,9 @@ function optionalString(value: unknown) {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function buildSummary(questions: CollectionQuestion[]): QuestionCollectionSummary {
+export function buildQuestionCollectionSummary(
+  questions: CollectionQuestion[],
+): QuestionCollectionSummary {
   const categories = new Set<string>();
   const subcategories = new Set<string>();
   const sources = new Set<string>();
@@ -256,7 +258,7 @@ export function validateQuestionCollectionJson(raw: string): ValidationResult {
     version: "1",
     importedAt: new Date().toISOString(),
     questions: normalizedQuestions,
-    summary: buildSummary(normalizedQuestions),
+    summary: buildQuestionCollectionSummary(normalizedQuestions),
   };
 
   return { ok: true, collection };

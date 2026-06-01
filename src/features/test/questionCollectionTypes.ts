@@ -1,5 +1,3 @@
-import { MockQuestion } from "./testTypes";
-
 export type ImportedQuestionCollection = {
   version: "1";
   questions: ImportedQuestion[];
@@ -65,15 +63,3 @@ export type ValidationIssue = {
 export type ValidationResult =
   | { ok: true; collection: QuestionCollection }
   | { ok: false; errors: ValidationIssue[] };
-
-export function mapCollectionToSessionQuestions(collection: QuestionCollection): MockQuestion[] {
-  return collection.questions.map((question) => ({
-    id: question.id,
-    statement: question.question,
-    topic: question.questionCategory,
-    category: question.questionSubcategory || "General",
-    options: question.options,
-    correctOptionId: question.correctOptions[0] || "",
-    explanation: question.correctAnswerExplanation || "No explanation provided.",
-  }));
-}
