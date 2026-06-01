@@ -298,9 +298,9 @@ export function TestSection({
     const queueItem = activeAttempt.queue[activeAttempt.currentQueueIndex];
     if (!queueItem || activeAttempt.submittedAnswers[queueItem.queueId]) return;
     const selectedOptionIds = activeAttempt.draftSelections[queueItem.queueId] || [];
-    if (selectedOptionIds.length === 0) return;
 
-    const isCorrect = isExactSetMatch(selectedOptionIds, queueItem.question.correctOptions);
+    const isCorrect = selectedOptionIds.length > 0
+      && isExactSetMatch(selectedOptionIds, queueItem.question.correctOptions);
     const runtimeAnswer: RuntimeAnswer = {
       selectedOptionIds,
       isCorrect,
@@ -357,11 +357,11 @@ export function TestSection({
     if (!activeAttempt) return;
     const definition = definitions.find((item) => item.id === activeAttempt.testId);
     if (!definition) return;
-    const unansweredCount = activeAttempt.queue.filter(
-      (queueItem) => !activeAttempt.submittedAnswers[queueItem.queueId],
+    const unansweredOriginalCount = activeAttempt.queue.filter(
+      (queueItem) => queueItem.retryNumber === 0 && !activeAttempt.submittedAnswers[queueItem.queueId],
     ).length;
-    if (!definition.allowUnanswered && unansweredCount > 0) {
-      setFinishWarning(t("test.finishWarning", { count: unansweredCount }));
+    if (!definition.allowUnanswered && unansweredOriginalCount > 0) {
+      setFinishWarning(t("test.finishWarning", { count: unansweredOriginalCount }));
       return;
     }
     const result = calculateAttemptResult(activeAttempt, definition);
@@ -484,7 +484,7 @@ export function TestSection({
               <Button variant="secondary" onClick={goToPreviousQuestion}>{t("test.previous")}</Button>
             ) : null}
             {showAnswer ? (
-              <Button onClick={submitCurrentAnswer} disabled={currentDraft.length === 0}>{t("test.answer")}</Button>
+              <Button onClick={submitCurrentAnswer}>{t("test.answer")}</Button>
             ) : null}
             {showNext ? (
               <Button variant="secondary" onClick={goToNextQuestion}>{t("test.next")}</Button>

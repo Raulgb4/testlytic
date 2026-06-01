@@ -87,7 +87,7 @@ export function calculateAttemptResult(
     const current = categoryMap.get(category) ?? { correct: 0, incorrect: 0, unanswered: 0, total: 0 };
     current.total += 1;
 
-    if (!answer || answer.selectedOptionIds.length === 0) {
+    if (!answer) {
       unansweredQuestions += 1;
       current.unanswered += 1;
       categoryMap.set(category, current);
