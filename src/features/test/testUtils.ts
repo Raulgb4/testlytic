@@ -68,18 +68,39 @@ export function calculateAttemptResult(
   let correctAnswers = 0;
   let incorrectAnswers = 0;
   let unansweredQuestions = 0;
+  let retryCorrectAnswers = 0;
+  let retryIncorrectAnswers = 0;
+  const categoryMap = new Map<string, { correct: number; incorrect: number; unanswered: number; total: number }>();
 
   for (const queueItem of activeAttempt.queue) {
     const answer = activeAttempt.submittedAnswers[queueItem.queueId];
+    const isRetry = queueItem.retryNumber > 0;
+    if (isRetry) {
+      if (answer?.isCorrect) retryCorrectAnswers += 1;
+      if (answer && !answer.isCorrect) retryIncorrectAnswers += 1;
+      continue;
+    }
+
+    const category = queueItem.question.questionSubcategory
+      ? `${queueItem.question.questionCategory} / ${queueItem.question.questionSubcategory}`
+      : queueItem.question.questionCategory;
+    const current = categoryMap.get(category) ?? { correct: 0, incorrect: 0, unanswered: 0, total: 0 };
+    current.total += 1;
+
     if (!answer || answer.selectedOptionIds.length === 0) {
       unansweredQuestions += 1;
+      current.unanswered += 1;
+      categoryMap.set(category, current);
       continue;
     }
     if (answer.isCorrect) {
       correctAnswers += 1;
+      current.correct += 1;
     } else {
       incorrectAnswers += 1;
+      current.incorrect += 1;
     }
+    categoryMap.set(category, current);
   }
 
   const completedAtIso = new Date().toISOString();
@@ -89,12 +110,14 @@ export function calculateAttemptResult(
   const finalScore = definition.negativeMarkingEnabled
     ? correctAnswers - incorrectAnswers * definition.penaltyPerIncorrectAnswer
     : correctAnswers;
-  const totalQuestions = activeAttempt.queue.length;
+  const totalQuestions = activeAttempt.originalQuestionCount;
   const accuracyPercentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+  const gradeOutOf10 = Math.max(0, Math.min(10, totalQuestions > 0 ? (finalScore / totalQuestions) * 10 : 0));
 
   return {
     id: `attempt-${Date.now()}`,
     testId: activeAttempt.testId,
+    testTitle: definition.title,
     startedAt: activeAttempt.startedAt,
     completedAt: completedAtIso,
     durationSeconds: Math.max(0, Math.floor((completedAtMs - startedAtMs) / 1000)),
@@ -105,5 +128,14 @@ export function calculateAttemptResult(
     rawScore,
     finalScore,
     accuracyPercentage,
+    gradeOutOf10,
+    retryAttempts: retryCorrectAnswers + retryIncorrectAnswers,
+    retryCorrectAnswers,
+    retryIncorrectAnswers,
+    categoryResults: Array.from(categoryMap.entries()).map(([category, result]) => ({
+      category,
+      ...result,
+      accuracyPercentage: result.total > 0 ? (result.correct / result.total) * 100 : 0,
+    })),
   };
 }

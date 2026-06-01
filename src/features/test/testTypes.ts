@@ -57,6 +57,7 @@ export type ActiveTestAttempt = {
 export type TestAttempt = {
   id: string;
   testId: string;
+  testTitle: string;
   startedAt: string;
   completedAt: string;
   durationSeconds: number;
@@ -67,4 +68,20 @@ export type TestAttempt = {
   rawScore: number;
   finalScore: number;
   accuracyPercentage: number;
+  gradeOutOf10: number;
+  retryAttempts: number;
+  retryCorrectAnswers: number;
+  retryIncorrectAnswers: number;
+  categoryResults: CategoryAttemptResult[];
 };
+
+export type CategoryAttemptResult = {
+  category: string;
+  correct: number;
+  incorrect: number;
+  unanswered: number;
+  total: number;
+  accuracyPercentage: number;
+};
+
+export type CompletedTestAttempt = TestAttempt;

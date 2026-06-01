@@ -10,7 +10,7 @@ import {
   buildQuestionCollectionSummary,
   validateQuestionCollectionJson,
 } from "./questionCollectionValidation";
-import { ActiveTestAttempt, RuntimeAnswer, RuntimeQueueItem, TestAttempt, TestDefinition } from "./testTypes";
+import { ActiveTestAttempt, CompletedTestAttempt, RuntimeAnswer, RuntimeQueueItem, TestAttempt, TestDefinition } from "./testTypes";
 import { buildRuntimeQuestions, calculateAttemptResult, getCategoryOptions, getMatchingQuestions, getSubcategoryOptions, isExactSetMatch } from "./testUtils";
 
 type TestFormState = {
@@ -35,7 +35,13 @@ const INITIAL_FORM: TestFormState = {
   timeLimitMinutes: 30,
 };
 
-export function TestSection({ t }: { t: Translator }) {
+export function TestSection({
+  t,
+  onCompletedAttempt,
+}: {
+  t: Translator;
+  onCompletedAttempt: (attempt: CompletedTestAttempt) => void;
+}) {
   const importMoreInputId = useId();
   const importMoreInputRef = useRef<HTMLInputElement | null>(null);
   const [collection, setCollection] = useState<QuestionCollection | null>(null);
@@ -300,6 +306,7 @@ export function TestSection({ t }: { t: Translator }) {
     }
     const result = calculateAttemptResult(activeAttempt, definition);
     setResultAttempt({ result, definition });
+    onCompletedAttempt(result);
     setActiveAttempt(null);
   };
 
@@ -338,6 +345,7 @@ export function TestSection({ t }: { t: Translator }) {
       0,
       Math.floor((nowMs - new Date(activeAttempt.startedAt).getTime()) / 1000),
     );
+    const visibleQuestionPosition = Math.min(activeAttempt.currentQueueIndex + 1, activeAttempt.originalQuestionCount);
     const visibleCategory = currentQuestion.questionSubcategory
       ? `${currentQuestion.questionCategory} / ${currentQuestion.questionSubcategory}`
       : currentQuestion.questionCategory;
@@ -349,7 +357,7 @@ export function TestSection({ t }: { t: Translator }) {
             <h3>{activeDefinition?.title || t("test.activeTitle")}</h3>
             <p>{visibleCategory}</p>
           </div>
-          <MetricLine label={t("test.statusQuestion")} value={`${activeAttempt.currentQueueIndex + 1}/${activeAttempt.queue.length}`} />
+          <MetricLine label={t("test.statusQuestion")} value={`${visibleQuestionPosition}/${activeAttempt.originalQuestionCount}`} />
           <MetricLine label={t("test.statusCorrect")} value={String(correctCount)} />
           <MetricLine label={t("test.statusWrong")} value={String(wrongCount)} />
           <MetricLine label={t("test.statusAnswered")} value={`${answeredCount}/${activeAttempt.queue.length}`} />
@@ -386,14 +394,20 @@ export function TestSection({ t }: { t: Translator }) {
               );
             })}
           </div>
-        </Card>
 
-        <div className="test-runner-footer">
-          <Button variant="secondary" onClick={() => setActiveAttempt({ ...activeAttempt, currentQueueIndex: Math.max(0, activeAttempt.currentQueueIndex - 1) })} disabled={activeAttempt.currentQueueIndex === 0}>{t("test.previous")}</Button>
-          <Button onClick={submitCurrentAnswer} disabled={currentDraft.length === 0 || Boolean(currentAnswer)}>{t("test.answer")}</Button>
-          <Button variant="secondary" onClick={() => setActiveAttempt({ ...activeAttempt, currentQueueIndex: Math.min(activeAttempt.queue.length - 1, activeAttempt.currentQueueIndex + 1) })} disabled={activeAttempt.currentQueueIndex === activeAttempt.queue.length - 1 || (!activeDefinition?.allowUnanswered && !currentAnswer)}>{t("test.next")}</Button>
-          <Button onClick={finishActiveTest}>{t("test.finish")}</Button>
-        </div>
+          <div className="test-runner-footer">
+            {activeAttempt.currentQueueIndex > 0 ? (
+              <Button variant="secondary" onClick={() => setActiveAttempt({ ...activeAttempt, currentQueueIndex: Math.max(0, activeAttempt.currentQueueIndex - 1) })}>{t("test.previous")}</Button>
+            ) : null}
+            {!currentAnswer ? (
+              <Button onClick={submitCurrentAnswer} disabled={currentDraft.length === 0}>{t("test.answer")}</Button>
+            ) : null}
+            {currentAnswer && activeAttempt.currentQueueIndex < activeAttempt.queue.length - 1 ? (
+              <Button variant="secondary" onClick={() => setActiveAttempt({ ...activeAttempt, currentQueueIndex: Math.min(activeAttempt.queue.length - 1, activeAttempt.currentQueueIndex + 1) })}>{t("test.next")}</Button>
+            ) : null}
+            <Button onClick={finishActiveTest}>{t("test.finish")}</Button>
+          </div>
+        </Card>
         {finishWarning ? <p className="field-error runner-finish-warning">{finishWarning}</p> : null}
       </div>
     );
@@ -402,22 +416,31 @@ export function TestSection({ t }: { t: Translator }) {
   if (resultAttempt) {
     const { result, definition } = resultAttempt;
     return (
-      <div className="view-grid">
-        <Card title={t("test.resultsTitle")} subtitle={definition.title}>
+      <div className="view-grid results-view">
+        <Card title={t("test.finalGrade")} subtitle={definition.title} className="results-hero-card">
+          <p className="results-grade">{result.gradeOutOf10.toFixed(1)} / 10</p>
           <div className="results-meta-line">
-            <span>{t("test.startedFriendly", { value: formatDateTime(result.startedAt) })}</span>
             <span>{t("test.completedFriendly", { value: formatDateTime(result.completedAt) })}</span>
+            <span>{t("test.kpiDuration")}: {formatDuration(result.durationSeconds)}</span>
           </div>
+        </Card>
 
+        <Card title={t("test.resultsTitle")} subtitle={t("test.resultsSubtitle") } className="results-summary-card">
           <div className="kpi-grid results-kpi-grid">
-            <MetricLine label={t("test.kpiScore")} value={`${result.finalScore.toFixed(2)}`} />
+            <MetricLine label={t("test.finalScoreFriendly")} value={`${result.finalScore.toFixed(2)}`} />
             <MetricLine label={t("test.kpiAccuracy")} value={`${result.accuracyPercentage.toFixed(2)}%`} />
             <MetricLine label={t("test.kpiCorrect")} value={String(result.correctAnswers)} />
             <MetricLine label={t("test.kpiIncorrect")} value={String(result.incorrectAnswers)} />
             <MetricLine label={t("test.kpiUnanswered")} value={String(result.unansweredQuestions)} />
             <MetricLine label={t("test.kpiDuration")} value={formatDuration(result.durationSeconds)} />
           </div>
-          <div className="card-actions">
+          <div className="retry-summary">
+            <MetricLine label={t("test.retryAttempts")} value={String(result.retryAttempts)} />
+            <MetricLine label={t("test.retryCorrect")} value={String(result.retryCorrectAnswers)} />
+            <MetricLine label={t("test.retryWrong")} value={String(result.retryIncorrectAnswers)} />
+          </div>
+          <p className="placeholder-note">{t("test.retryLearningNote")}</p>
+          <div className="results-return-action">
             <Button onClick={() => setResultAttempt(null)}>{t("test.returnToHome")}</Button>
           </div>
         </Card>

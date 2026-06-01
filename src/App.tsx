@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { AppShell } from "./app/AppShell";
 import { SectionId } from "./app/navigation";
-import { MockAnswerHistoryRow, MockCompletedAttempt } from "./features/analytics/analyticsTypes";
-import { MOCK_ANSWER_HISTORY, MOCK_COMPLETED_ATTEMPTS } from "./features/analytics/mockAnalytics";
+import { CompletedTestAttempt } from "./features/test/testTypes";
 import { createTranslator, Language } from "./i18n";
 
 type ThemeMode = "dark" | "light";
@@ -12,8 +11,7 @@ function App() {
   const [theme, setTheme] = useState<ThemeMode>("dark");
   const [language, setLanguage] = useState<Language>("English");
   const [completedAttempts, setCompletedAttempts] =
-    useState<MockCompletedAttempt[]>(MOCK_COMPLETED_ATTEMPTS);
-  const [answerHistory, setAnswerHistory] = useState<MockAnswerHistoryRow[]>(MOCK_ANSWER_HISTORY);
+    useState<CompletedTestAttempt[]>([]);
 
   const t = useMemo(() => createTranslator(language), [language]);
 
@@ -27,8 +25,7 @@ function App() {
       language={language}
       setLanguage={setLanguage}
       completedAttempts={completedAttempts}
-      answerHistory={answerHistory}
-      onDeleteAllAnswers={() => setAnswerHistory([])}
+      onAddCompletedAttempt={(attempt) => setCompletedAttempts((current) => [attempt, ...current])}
       onDeleteAllCompletedTests={() => setCompletedAttempts([])}
     />
   );

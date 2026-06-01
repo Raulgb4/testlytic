@@ -1,8 +1,8 @@
 import appLogo from "../assets/logo/NEW LOGO.png";
 import { AnalyticsSection } from "../features/analytics/AnalyticsSection";
-import { MockAnswerHistoryRow, MockCompletedAttempt } from "../features/analytics/analyticsTypes";
 import { SettingsSection } from "../features/settings/SettingsSection";
 import { TestSection } from "../features/test/TestSection";
+import { CompletedTestAttempt } from "../features/test/testTypes";
 import { Language } from "../i18n";
 import { NavItem } from "../shared/components/NavItem";
 import { NAV_ITEMS, SectionId } from "./navigation";
@@ -19,8 +19,7 @@ export function AppShell({
   language,
   setLanguage,
   completedAttempts,
-  answerHistory,
-  onDeleteAllAnswers,
+  onAddCompletedAttempt,
   onDeleteAllCompletedTests,
 }: {
   t: Translator;
@@ -30,9 +29,8 @@ export function AppShell({
   setTheme: (theme: ThemeMode) => void;
   language: Language;
   setLanguage: (language: Language) => void;
-  completedAttempts: MockCompletedAttempt[];
-  answerHistory: MockAnswerHistoryRow[];
-  onDeleteAllAnswers: () => void;
+  completedAttempts: CompletedTestAttempt[];
+  onAddCompletedAttempt: (attempt: CompletedTestAttempt) => void;
   onDeleteAllCompletedTests: () => void;
 }) {
   const activeItem = NAV_ITEMS.find((item) => item.id === section);
@@ -75,12 +73,11 @@ export function AppShell({
             </header>
           ) : null}
 
-          {section === "test" ? <TestSection t={t} /> : null}
+          {section === "test" ? <TestSection t={t} onCompletedAttempt={onAddCompletedAttempt} /> : null}
           {section === "analytics" ? (
             <AnalyticsSection
               t={t}
               completedAttempts={completedAttempts}
-              answerHistory={answerHistory}
             />
           ) : null}
           {section === "settings" ? (
@@ -90,9 +87,9 @@ export function AppShell({
               setLanguage={setLanguage}
               theme={theme}
               setTheme={setTheme}
-              answerCount={answerHistory.length}
+              answerCount={0}
               completedCount={completedAttempts.length}
-              onDeleteAllAnswers={onDeleteAllAnswers}
+              onDeleteAllAnswers={() => undefined}
               onDeleteAllCompletedTests={onDeleteAllCompletedTests}
             />
           ) : null}
