@@ -336,11 +336,16 @@ export function TestSection({
     const currentQuestion = currentQueueItem.question;
     const currentAnswer = activeAttempt.submittedAnswers[currentQueueItem.queueId];
     const currentDraft = activeAttempt.draftSelections[currentQueueItem.queueId] || [];
-    const submittedAnswers = Object.values(activeAttempt.submittedAnswers).filter(Boolean);
-    const correctCount = submittedAnswers.filter((answer) => answer?.isCorrect).length;
-    const wrongCount = submittedAnswers.filter((answer) => answer && !answer.isCorrect).length;
-    const answeredCount = submittedAnswers.length;
     const activeDefinition = definitions.find((item) => item.id === activeAttempt.testId);
+    const originalCounters = activeDefinition
+      ? getOriginalAttemptCounters(activeAttempt, activeDefinition)
+      : {
+          correct: 0,
+          wrong: 0,
+          answered: 0,
+          total: activeAttempt.originalQuestionCount,
+          gradeOutOf10: 0,
+        };
     const elapsedSeconds = Math.max(
       0,
       Math.floor((nowMs - new Date(activeAttempt.startedAt).getTime()) / 1000),
@@ -357,10 +362,14 @@ export function TestSection({
             <h3>{activeDefinition?.title || t("test.activeTitle")}</h3>
             <p>{visibleCategory}</p>
           </div>
+          <div className="metric-inline status-grade-metric">
+            <span className="metric-inline-label">{t("test.statusGrade")}</span>
+            <span className="metric-inline-value">{originalCounters.gradeOutOf10.toFixed(1)} / 10</span>
+          </div>
           <MetricLine label={t("test.statusQuestion")} value={`${visibleQuestionPosition}/${activeAttempt.originalQuestionCount}`} />
-          <MetricLine label={t("test.statusCorrect")} value={String(correctCount)} />
-          <MetricLine label={t("test.statusWrong")} value={String(wrongCount)} />
-          <MetricLine label={t("test.statusAnswered")} value={`${answeredCount}/${activeAttempt.queue.length}`} />
+          <MetricLine label={t("test.statusCorrect")} value={String(originalCounters.correct)} />
+          <MetricLine label={t("test.statusWrong")} value={String(originalCounters.wrong)} />
+          <MetricLine label={t("test.statusAnswered")} value={`${originalCounters.answered}/${originalCounters.total}`} />
           <MetricLine label={t("test.statusElapsed")} value={formatDuration(elapsedSeconds)} />
           <MetricLine
             label={t("test.statusLimit")}
@@ -753,6 +762,57 @@ function formatDateTime(iso: string) {
 
 function getVisibleOptionLabel(index: number) {
   return String.fromCharCode(65 + index);
+}
+
+function getOriginalAttemptCounters(activeAttempt: ActiveTestAttempt, definition: TestDefinition) {
+  let correct = 0;
+  let wrong = 0;
+  let answered = 0;
+
+  for (const queueItem of activeAttempt.queue) {
+    if (queueItem.retryNumber > 0) continue;
+    const answer = activeAttempt.submittedAnswers[queueItem.queueId];
+    if (!answer) continue;
+    answered += 1;
+    if (answer.isCorrect) {
+      correct += 1;
+    } else {
+      wrong += 1;
+    }
+  }
+
+  return {
+    correct,
+    wrong,
+    answered,
+    total: activeAttempt.originalQuestionCount,
+    gradeOutOf10: calculateLiveGrade(activeAttempt, definition),
+  };
+}
+
+function calculateLiveGrade(activeAttempt: ActiveTestAttempt, definition: TestDefinition) {
+  const counters = activeAttempt.queue.reduce(
+    (result, queueItem) => {
+      if (queueItem.retryNumber > 0) return result;
+      const answer = activeAttempt.submittedAnswers[queueItem.queueId];
+      if (!answer) return result;
+      if (answer.isCorrect) {
+        result.correct += 1;
+      } else {
+        result.incorrect += 1;
+      }
+      return result;
+    },
+    { correct: 0, incorrect: 0 },
+  );
+
+  const finalScore = definition.negativeMarkingEnabled
+    ? counters.correct - counters.incorrect * definition.penaltyPerIncorrectAnswer
+    : counters.correct;
+  const grade = activeAttempt.originalQuestionCount > 0
+    ? (finalScore / activeAttempt.originalQuestionCount) * 10
+    : 0;
+  return Math.max(0, Math.min(10, grade));
 }
 
 function validateDefinitionForm(

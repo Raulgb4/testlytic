@@ -159,6 +159,7 @@
     "noTimeLimit": "Sin límite de tiempo",
     "answerOptions": "Opciones de respuesta",
     "answer": "Responder",
+    "statusGrade": "Nota",
     "statusQuestion": "Pregunta",
     "statusCorrect": "Correctas",
     "statusWrong": "Falladas",

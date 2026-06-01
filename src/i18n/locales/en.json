@@ -159,6 +159,7 @@
     "noTimeLimit": "No time limit",
     "answerOptions": "Answer options",
     "answer": "Answer",
+    "statusGrade": "Grade",
     "statusQuestion": "Question",
     "statusCorrect": "Correct",
     "statusWrong": "Wrong",
