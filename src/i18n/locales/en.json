@@ -143,6 +143,8 @@
     "searchSubcategories": "Search subcategories",
     "selectedCount": "Selected: {count}",
     "clearAll": "Clear all",
+    "selectAllCategories": "Select All",
+    "deselectAllCategories": "Deselect All",
     "selectCategoryFirst": "Select at least one category first.",
     "fixFieldsBeforeSave": "Fix {count} field(s) before saving.",
     "saveTest": "Save Test",

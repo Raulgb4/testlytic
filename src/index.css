@@ -1113,12 +1113,26 @@ body {
   gap: 8px;
   align-items: center;
   padding: 0.2rem 0.1rem;
+  min-width: 0;
+}
+
+.multi-select-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .multi-select-actions {
   display: flex;
   justify-content: space-between;
   gap: 8px;
+  align-items: center;
+}
+
+.multi-select-bulk-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
 }
 
 .penalty-reveal {
@@ -1651,6 +1665,17 @@ body {
 
   .test-runner-footer .btn {
     flex: 1 1 180px;
+  }
+
+  .multi-select-actions,
+  .multi-select-bulk-actions {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .multi-select-actions .btn,
+  .multi-select-bulk-actions .btn {
+    flex: 1 1 130px;
   }
 
   .status-grade-metric {

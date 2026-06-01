@@ -143,6 +143,8 @@
     "searchSubcategories": "Buscar subcategorías",
     "selectedCount": "Seleccionadas: {count}",
     "clearAll": "Limpiar todo",
+    "selectAllCategories": "Seleccionar todo",
+    "deselectAllCategories": "Deseleccionar todo",
     "selectCategoryFirst": "Selecciona al menos una categoría primero.",
     "fixFieldsBeforeSave": "Corrige {count} campo(s) antes de guardar.",
     "saveTest": "Guardar prueba",

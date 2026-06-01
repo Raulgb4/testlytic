@@ -83,6 +83,33 @@ export function TestSection({
     () => getSubcategoryOptions(bankQuestions, formState.includedCategories),
     [bankQuestions, formState.includedCategories],
   );
+  useEffect(() => {
+    if (!formOpen) return;
+    setFormState((current) => {
+      const availableCategories = new Set(categoryOptions);
+      const nextCategories = current.includedCategories.filter((category) =>
+        availableCategories.has(category),
+      );
+      const allowedSubcategories = getSubcategoryOptions(bankQuestions, nextCategories);
+      const availableSubcategories = new Set(allowedSubcategories);
+      const nextSubcategories = current.includedSubcategories.filter((subcategory) =>
+        availableSubcategories.has(subcategory),
+      );
+
+      if (
+        isSameStringList(nextCategories, current.includedCategories) &&
+        isSameStringList(nextSubcategories, current.includedSubcategories)
+      ) {
+        return current;
+      }
+
+      return {
+        ...current,
+        includedCategories: nextCategories,
+        includedSubcategories: nextSubcategories,
+      };
+    });
+  }, [bankQuestions, categoryOptions, formOpen]);
 
   const importCollectionFile = async (file: File) => {
     const raw = await file.text();
@@ -203,6 +230,17 @@ export function TestSection({
       return [payload, ...current];
     });
     setFormOpen(false);
+  };
+
+  const updateIncludedCategories = (next: string[]) => {
+    const allowedSubcategories = getSubcategoryOptions(bankQuestions, next);
+    setFormState((current) => ({
+      ...current,
+      includedCategories: next,
+      includedSubcategories: current.includedSubcategories.filter((item) =>
+        allowedSubcategories.includes(item),
+      ),
+    }));
   };
 
   const runDefinition = (definition: TestDefinition) => {
@@ -561,20 +599,13 @@ export function TestSection({
                     placeholder={t("test.searchCategories")}
                     options={categoryOptions}
                     selected={formState.includedCategories}
-                    onChange={(next) => {
-                      const allowedSubcategories = getSubcategoryOptions(bankQuestions, next);
-                      setFormState({
-                        ...formState,
-                        includedCategories: next,
-                        includedSubcategories: formState.includedSubcategories.filter((item) =>
-                          allowedSubcategories.includes(item),
-                        ),
-                      });
-                    }}
+                    onChange={updateIncludedCategories}
                     triggerRef={categoriesTriggerRef}
                     error={showErrors ? formValidation.errors.includedCategories : undefined}
                     selectedCountLabel={t("test.selectedCount", { count: formState.includedCategories.length })}
                     clearLabel={t("test.clearAll")}
+                    selectAllLabel={t("test.selectAllCategories")}
+                    onSelectAll={() => updateIncludedCategories(categoryOptions)}
                     closeLabel={t("test.close")}
                   />
 
@@ -588,6 +619,8 @@ export function TestSection({
                     disabledText={t("test.selectCategoryFirst")}
                     selectedCountLabel={t("test.selectedCount", { count: formState.includedSubcategories.length })}
                     clearLabel={t("test.clearAll")}
+                    selectAllLabel={t("test.selectAllCategories")}
+                    onSelectAll={() => setFormState({ ...formState, includedSubcategories: subcategoryOptions })}
                     closeLabel={t("test.close")}
                   />
                 </section>
@@ -764,6 +797,11 @@ function getVisibleOptionLabel(index: number) {
   return String.fromCharCode(65 + index);
 }
 
+function isSameStringList(left: string[], right: string[]) {
+  if (left.length !== right.length) return false;
+  return left.every((item, index) => item === right[index]);
+}
+
 function getOriginalAttemptCounters(activeAttempt: ActiveTestAttempt, definition: TestDefinition) {
   let correct = 0;
   let wrong = 0;
@@ -885,6 +923,8 @@ function SearchableMultiSelect({
   onChange,
   selectedCountLabel,
   clearLabel,
+  selectAllLabel,
+  onSelectAll,
   closeLabel,
   disabled,
   disabledText,
@@ -898,6 +938,8 @@ function SearchableMultiSelect({
   onChange: (next: string[]) => void;
   selectedCountLabel: string;
   clearLabel: string;
+  selectAllLabel?: string;
+  onSelectAll?: () => void;
   closeLabel: string;
   disabled?: boolean;
   disabledText?: string;
@@ -906,7 +948,11 @@ function SearchableMultiSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const filtered = options.filter((item) => item.toLowerCase().includes(query.toLowerCase()));
+  const selectedValues = useMemo(() => new Set(selected), [selected]);
+  const filtered = useMemo(
+    () => options.filter((item) => item.toLowerCase().includes(query.toLowerCase())),
+    [options, query],
+  );
 
   const toggleSelection = (value: string) => {
     if (selected.includes(value)) {
@@ -943,7 +989,7 @@ function SearchableMultiSelect({
               <label key={option} className="multi-select-option">
                 <input
                   type="checkbox"
-                  checked={selected.includes(option)}
+                  checked={selectedValues.has(option)}
                   onChange={() => toggleSelection(option)}
                 />
                 <span>{option}</span>
@@ -951,9 +997,21 @@ function SearchableMultiSelect({
             ))}
           </div>
           <div className="multi-select-actions">
-            <button type="button" className="btn btn-secondary" onClick={() => onChange([])}>
-              {clearLabel}
-            </button>
+            <div className="multi-select-bulk-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => onChange([])}>
+                {clearLabel}
+              </button>
+              {selectAllLabel && onSelectAll ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={onSelectAll}
+                  disabled={options.length === 0}
+                >
+                  {selectAllLabel}
+                </button>
+              ) : null}
+            </div>
             <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
               {closeLabel}
             </button>
