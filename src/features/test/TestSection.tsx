@@ -331,6 +331,28 @@ export function TestSection({
     setFinishWarning("");
   };
 
+  const goToPreviousQuestion = () => {
+    setActiveAttempt((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        currentQueueIndex: Math.max(0, current.currentQueueIndex - 1),
+      };
+    });
+    setFinishWarning("");
+  };
+
+  const goToNextQuestion = () => {
+    setActiveAttempt((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        currentQueueIndex: Math.min(current.queue.length - 1, current.currentQueueIndex + 1),
+      };
+    });
+    setFinishWarning("");
+  };
+
   const finishActiveTest = () => {
     if (!activeAttempt) return;
     const definition = definitions.find((item) => item.id === activeAttempt.testId);
@@ -375,6 +397,11 @@ export function TestSection({
     const currentAnswer = activeAttempt.submittedAnswers[currentQueueItem.queueId];
     const currentDraft = activeAttempt.draftSelections[currentQueueItem.queueId] || [];
     const activeDefinition = definitions.find((item) => item.id === activeAttempt.testId);
+    const allowUnanswered = activeDefinition?.allowUnanswered || false;
+    const hasSubmittedCurrentAnswer = Boolean(currentAnswer);
+    const hasNextQuestion = activeAttempt.currentQueueIndex < activeAttempt.queue.length - 1;
+    const showAnswer = !hasSubmittedCurrentAnswer;
+    const showNext = hasNextQuestion && (allowUnanswered || hasSubmittedCurrentAnswer);
     const originalCounters = activeDefinition
       ? getOriginalAttemptCounters(activeAttempt, activeDefinition)
       : {
@@ -388,6 +415,7 @@ export function TestSection({
       0,
       Math.floor((nowMs - new Date(activeAttempt.startedAt).getTime()) / 1000),
     );
+    const timeUrgency = getTimeUrgency(elapsedSeconds, activeDefinition?.timeLimitMinutes || 0);
     const visibleQuestionPosition = Math.min(activeAttempt.currentQueueIndex + 1, activeAttempt.originalQuestionCount);
     const visibleCategory = currentQuestion.questionSubcategory
       ? `${currentQuestion.questionCategory} / ${currentQuestion.questionSubcategory}`
@@ -395,26 +423,35 @@ export function TestSection({
 
     return (
       <div className="test-runner-full">
-        <section className="test-status-bar" aria-label={t("test.activeTitle")}>
-          <div className="test-status-title">
-            <h3>{activeDefinition?.title || t("test.activeTitle")}</h3>
-            <p>{visibleCategory}</p>
+        <section className={`test-exam-header time-${timeUrgency}`} aria-label={t("test.activeTitle")}>
+          <div className="test-exam-header-main">
+            <div className="test-exam-title-block">
+              <h3>{activeDefinition?.title || t("test.activeTitle")}</h3>
+              <p>{visibleCategory}</p>
+            </div>
+            <div
+              className="test-exam-grade"
+              aria-label={`${t("test.statusGrade")} ${originalCounters.gradeOutOf10.toFixed(1)} / 10`}
+            >
+              <span>{t("test.statusGrade")}</span>
+              <strong>{originalCounters.gradeOutOf10.toFixed(1)} / 10</strong>
+            </div>
           </div>
-          <div className="metric-inline status-grade-metric">
-            <span className="metric-inline-label">{t("test.statusGrade")}</span>
-            <span className="metric-inline-value">{originalCounters.gradeOutOf10.toFixed(1)} / 10</span>
+
+          <div className="test-exam-stats">
+            <MetricLine label={t("test.statusQuestion")} value={`${visibleQuestionPosition}/${activeAttempt.originalQuestionCount}`} />
+            <MetricLine label={t("test.statusAnswered")} value={`${originalCounters.answered}/${originalCounters.total}`} />
+            <MetricLine label={t("test.statusCorrect")} value={String(originalCounters.correct)} />
+            <MetricLine label={t("test.statusWrong")} value={String(originalCounters.wrong)} />
+            <MetricLine label={t("test.statusElapsed")} value={formatDuration(elapsedSeconds)} />
+            <MetricLine
+              label={t("test.statusLimit")}
+              value={activeDefinition && activeDefinition.timeLimitMinutes > 0
+                ? t("test.limitMinutes", { minutes: activeDefinition.timeLimitMinutes })
+                : t("test.noTimeLimit")}
+              className={timeUrgency === "normal" ? undefined : "time-metric"}
+            />
           </div>
-          <MetricLine label={t("test.statusQuestion")} value={`${visibleQuestionPosition}/${activeAttempt.originalQuestionCount}`} />
-          <MetricLine label={t("test.statusCorrect")} value={String(originalCounters.correct)} />
-          <MetricLine label={t("test.statusWrong")} value={String(originalCounters.wrong)} />
-          <MetricLine label={t("test.statusAnswered")} value={`${originalCounters.answered}/${originalCounters.total}`} />
-          <MetricLine label={t("test.statusElapsed")} value={formatDuration(elapsedSeconds)} />
-          <MetricLine
-            label={t("test.statusLimit")}
-            value={activeDefinition && activeDefinition.timeLimitMinutes > 0
-              ? t("test.limitMinutes", { minutes: activeDefinition.timeLimitMinutes })
-              : t("test.noTimeLimit")}
-          />
         </section>
 
         <Card title={t("test.questionTitle", { number: activeAttempt.currentQueueIndex + 1 })} className="test-runner-card">
@@ -425,7 +462,7 @@ export function TestSection({
           <div className="runner-options" role="group" aria-label={t("test.answerOptions")}>
             {currentQuestion.options.map((option, optionIndex) => {
               const selected = currentDraft.includes(option.id) || currentAnswer?.selectedOptionIds.includes(option.id) || false;
-              const hasAnswer = Boolean(currentAnswer);
+              const hasAnswer = hasSubmittedCurrentAnswer;
               const isCorrectOption = currentQuestion.correctOptions.includes(option.id);
               let className = "runner-option";
               if (selected) className += " selected";
@@ -444,13 +481,13 @@ export function TestSection({
 
           <div className="test-runner-footer">
             {activeAttempt.currentQueueIndex > 0 ? (
-              <Button variant="secondary" onClick={() => setActiveAttempt({ ...activeAttempt, currentQueueIndex: Math.max(0, activeAttempt.currentQueueIndex - 1) })}>{t("test.previous")}</Button>
+              <Button variant="secondary" onClick={goToPreviousQuestion}>{t("test.previous")}</Button>
             ) : null}
-            {!currentAnswer ? (
+            {showAnswer ? (
               <Button onClick={submitCurrentAnswer} disabled={currentDraft.length === 0}>{t("test.answer")}</Button>
             ) : null}
-            {currentAnswer && activeAttempt.currentQueueIndex < activeAttempt.queue.length - 1 ? (
-              <Button variant="secondary" onClick={() => setActiveAttempt({ ...activeAttempt, currentQueueIndex: Math.min(activeAttempt.queue.length - 1, activeAttempt.currentQueueIndex + 1) })}>{t("test.next")}</Button>
+            {showNext ? (
+              <Button variant="secondary" onClick={goToNextQuestion}>{t("test.next")}</Button>
             ) : null}
             <Button onClick={finishActiveTest}>{t("test.finish")}</Button>
           </div>
@@ -772,9 +809,9 @@ export function TestSection({
   );
 }
 
-function MetricLine({ label, value }: { label: string; value: string }) {
+function MetricLine({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className="metric-inline">
+    <div className={className ? `metric-inline ${className}` : "metric-inline"}>
       <span className="metric-inline-label">{label}</span>
       <span className="metric-inline-value">{value}</span>
     </div>
@@ -795,6 +832,15 @@ function formatDateTime(iso: string) {
 
 function getVisibleOptionLabel(index: number) {
   return String.fromCharCode(65 + index);
+}
+
+function getTimeUrgency(elapsedSeconds: number, timeLimitMinutes: number) {
+  if (timeLimitMinutes <= 0) return "normal";
+  const totalSeconds = timeLimitMinutes * 60;
+  const remainingSeconds = totalSeconds - elapsedSeconds;
+  if (remainingSeconds <= 60) return "critical";
+  if (remainingSeconds <= 300 || remainingSeconds <= totalSeconds * 0.2) return "warning";
+  return "normal";
 }
 
 function isSameStringList(left: string[], right: string[]) {
