@@ -29,6 +29,7 @@ export function SettingsSection({
 }) {
   const [confirmAction, setConfirmAction] = useState<null | "answers" | "tests">(null);
   const [dangerMessage, setDangerMessage] = useState("");
+  const isDark = theme === "dark";
 
   const runDangerAction = () => {
     if (confirmAction === "answers") {
@@ -43,8 +44,8 @@ export function SettingsSection({
   };
 
   return (
-    <div className="view-grid">
-      <Card title={t("settings.preferencesTitle")} subtitle={t("settings.preferencesSubtitle")}>
+    <div className="settings-layout">
+      <Card title={t("settings.languageCardTitle")} subtitle={t("settings.languageCardSubtitle")}>
         <label className="field">
           <span>{t("settings.language")}</span>
           <select
@@ -56,60 +57,50 @@ export function SettingsSection({
             <option value="Spanish">{t("settings.spanish")}</option>
           </select>
         </label>
-
-        <div className="card-actions">
-          <Button
-            variant={theme === "dark" ? "primary" : "secondary"}
-            onClick={() => setTheme("dark")}
-          >
-            {t("settings.darkTheme")}
-          </Button>
-          <Button
-            variant={theme === "light" ? "primary" : "secondary"}
-            onClick={() => setTheme("light")}
-          >
-            {t("settings.lightTheme")}
-          </Button>
-        </div>
       </Card>
 
-      <Card title={t("settings.dangerTitle")} subtitle={t("settings.dangerSubtitle")}>
-        <div className="card-actions">
-          <Button
-            variant="secondary"
+      <Card title={t("settings.themeCardTitle")} subtitle={t("settings.themeCardSubtitle")}>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isDark}
+          aria-label={t("settings.themeSwitchLabel")}
+          className={isDark ? "theme-switch active" : "theme-switch"}
+          onClick={() => setTheme(isDark ? "light" : "dark")}
+        >
+          <span className="theme-switch-option">{t("settings.lightTheme")}</span>
+          <span className="theme-switch-option">{t("settings.darkTheme")}</span>
+          <span className="theme-switch-thumb" aria-hidden="true" />
+        </button>
+      </Card>
+
+      <Card
+        title={t("settings.dangerTitle")}
+        subtitle={t("settings.dangerSubtitle")}
+        className="settings-danger-card"
+      >
+        <div className="card-actions settings-danger-actions">
+          <button
+            type="button"
+            className="btn btn-danger"
             onClick={() => {
               setConfirmAction("answers");
               setDangerMessage("");
             }}
           >
             {t("settings.deleteAnswers")}
-          </Button>
-          <Button
-            variant="secondary"
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger"
             onClick={() => {
               setConfirmAction("tests");
               setDangerMessage("");
             }}
           >
             {t("settings.deleteTests")}
-          </Button>
+          </button>
         </div>
-
-        {confirmAction ? (
-          <div className="confirm-card">
-            <p className="placeholder-note">
-              {confirmAction === "answers"
-                ? t("settings.confirmDeleteAnswers")
-                : t("settings.confirmDeleteTests")}
-            </p>
-            <div className="card-actions">
-              <Button onClick={runDangerAction}>{t("settings.confirm")}</Button>
-              <Button variant="secondary" onClick={() => setConfirmAction(null)}>
-                {t("test.cancel")}
-              </Button>
-            </div>
-          </div>
-        ) : null}
 
         {dangerMessage ? <p className="placeholder-note">{dangerMessage}</p> : null}
 
@@ -118,19 +109,47 @@ export function SettingsSection({
         </p>
       </Card>
 
-      <Card title={t("settings.localDataTitle")} subtitle={t("settings.localDataSubtitle")}>
-        <p className="placeholder-note">{t("settings.localDataNote")}</p>
+      <Card title={t("settings.aboutTitle")} subtitle={t("settings.aboutSubtitle")}>
+        <div className="settings-about-rows">
+          <div className="settings-about-row">
+            <span>{t("settings.aboutDescriptionLabel")}</span>
+            <p>{t("settings.aboutDescription")}</p>
+          </div>
+          <div className="settings-about-row">
+            <span>{t("settings.aboutVersionLabel")}</span>
+            <p>0.1.0</p>
+          </div>
+          <div className="settings-about-row">
+            <span>{t("settings.aboutLicenseLabel")}</span>
+            <p>MIT</p>
+          </div>
+          <div className="settings-about-row">
+            <span>{t("settings.aboutAuthorLabel")}</span>
+            <p>Raúl García Balongo</p>
+          </div>
+        </div>
       </Card>
 
-      <Card title={t("settings.aboutTitle")} subtitle={t("settings.aboutSubtitle")}>
-        <div className="mode-grid">
-          <div className="pill">{t("settings.aboutApp")}</div>
-          <div className="pill">{t("settings.aboutVersion")}</div>
-          <div className="pill">{t("settings.aboutLicense")}</div>
-          <div className="pill">{t("settings.aboutAuthor")}</div>
+      {confirmAction ? (
+        <div className="settings-modal-backdrop" role="presentation" onClick={() => setConfirmAction(null)}>
+          <div className="settings-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <h3>{t("settings.confirmModalTitle")}</h3>
+            <p>
+              {confirmAction === "answers"
+                ? t("settings.confirmDeleteAnswers")
+                : t("settings.confirmDeleteTests")}
+            </p>
+            <div className="card-actions settings-modal-actions">
+              <Button variant="secondary" onClick={() => setConfirmAction(null)}>
+                {t("test.cancel")}
+              </Button>
+              <button type="button" className="btn btn-danger" onClick={runDangerAction}>
+                {t("settings.confirm")}
+              </button>
+            </div>
+          </div>
         </div>
-        <p className="placeholder-note">{t("settings.aboutDescription")}</p>
-      </Card>
+      ) : null}
     </div>
   );
 }

@@ -4,11 +4,12 @@ type CardProps = {
   title: string;
   subtitle?: string;
   children: ReactNode;
+  className?: string;
 };
 
-export function Card({ title, subtitle, children }: CardProps) {
+export function Card({ title, subtitle, children, className }: CardProps) {
   return (
-    <section className="card">
+    <section className={className ? `card ${className}` : "card"}>
       <header className="card-header">
         <h3>{title}</h3>
         {subtitle ? <p>{subtitle}</p> : null}

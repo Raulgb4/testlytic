@@ -65,7 +65,7 @@ export function AppShell({
             section === "analytics" ? "content-area analytics-content-area" : "content-area"
           }
         >
-          {section !== "analytics" ? (
+          {section !== "analytics" && section !== "settings" ? (
             <header className="content-header">
               <div>
                 <h2>{activeItem ? t(activeItem.labelKey) : ""}</h2>
