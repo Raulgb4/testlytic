@@ -1160,42 +1160,99 @@ body {
 
 .test-runner-full {
   width: 100%;
+  display: grid;
+  gap: 16px;
+  align-content: start;
 }
 
 .test-runner-card {
-  grid-column: 1 / -1;
+  grid-column: 1 / -1 !important;
+  width: 100%;
+  padding: 22px;
+}
+
+.test-status-bar {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 95%, transparent);
+  padding: 16px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(6, minmax(120px, 1fr));
+  gap: 10px;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.12);
+}
+
+.test-status-title {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.test-status-title h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.test-status-title p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.test-status-bar .metric-inline {
+  padding: 0.78rem 0.85rem;
+}
+
+.test-status-bar .metric-inline-label {
+  font-size: 0.78rem;
+}
+
+.test-status-bar .metric-inline-value {
+  font-size: 1.18rem;
 }
 
 .runner-question {
-  margin: 8px 0 0;
-  font-size: 1.36rem;
-  line-height: 1.42;
+  margin: 14px 0 0;
+  font-size: 1.85rem;
+  line-height: 1.5;
   font-weight: 700;
 }
 
 .runner-note {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.16rem;
   color: var(--text-muted);
+  line-height: 1.55;
 }
 
 .runner-options {
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 
 .runner-option {
   border: 1px solid var(--border);
-  border-radius: 13px;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--surface-2) 93%, transparent);
   color: var(--text);
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0.92rem;
+  padding: 1.12rem;
   text-align: left;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.runner-option:hover {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  transform: translateY(-1px);
 }
 
 .runner-option.selected {
@@ -1223,6 +1280,39 @@ body {
 
 .answer-feedback.incorrect {
   color: var(--danger);
+}
+
+.test-runner-footer {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 4px 0 0;
+}
+
+.test-runner-footer .btn {
+  min-height: 52px;
+  min-width: 150px;
+  font-size: 1.05rem;
+  border-radius: 12px;
+}
+
+.runner-finish-warning {
+  justify-self: end;
+}
+
+.results-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.results-kpi-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .analytics-tabs-card {
@@ -1381,6 +1471,18 @@ body {
     grid-template-columns: repeat(8, minmax(0, 1fr));
   }
 
+  .results-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .test-status-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .test-status-title {
+    grid-column: 1 / -1;
+  }
+
   .history-toolbar {
     grid-template-columns: 1fr;
   }
@@ -1399,6 +1501,27 @@ body {
 
   .chips-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .test-runner-footer {
+    justify-content: stretch;
+    flex-wrap: wrap;
+  }
+
+  .test-runner-footer .btn {
+    flex: 1 1 180px;
+  }
+
+  .test-status-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .runner-question {
+    font-size: 1.55rem;
+  }
+
+  .runner-option {
+    font-size: 1.05rem;
   }
 
   .tabs-row {

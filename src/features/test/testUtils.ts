@@ -55,7 +55,7 @@ export function buildRuntimeQuestions(definition: TestDefinition, bankQuestions:
   }));
 }
 
-function isExactSetMatch(selectedOptionIds: string[], correctOptions: string[]) {
+export function isExactSetMatch(selectedOptionIds: string[], correctOptions: string[]) {
   if (selectedOptionIds.length !== correctOptions.length) return false;
   const selectedSet = new Set(selectedOptionIds);
   return correctOptions.every((optionId) => selectedSet.has(optionId));
@@ -69,13 +69,13 @@ export function calculateAttemptResult(
   let incorrectAnswers = 0;
   let unansweredQuestions = 0;
 
-  for (const question of activeAttempt.questions) {
-    const answer = activeAttempt.answers[question.id];
+  for (const queueItem of activeAttempt.queue) {
+    const answer = activeAttempt.submittedAnswers[queueItem.queueId];
     if (!answer || answer.selectedOptionIds.length === 0) {
       unansweredQuestions += 1;
       continue;
     }
-    if (isExactSetMatch(answer.selectedOptionIds, question.correctOptions)) {
+    if (answer.isCorrect) {
       correctAnswers += 1;
     } else {
       incorrectAnswers += 1;
@@ -89,7 +89,7 @@ export function calculateAttemptResult(
   const finalScore = definition.negativeMarkingEnabled
     ? correctAnswers - incorrectAnswers * definition.penaltyPerIncorrectAnswer
     : correctAnswers;
-  const totalQuestions = activeAttempt.questions.length;
+  const totalQuestions = activeAttempt.queue.length;
   const accuracyPercentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
 
   return {

@@ -10,8 +10,8 @@ import {
   buildQuestionCollectionSummary,
   validateQuestionCollectionJson,
 } from "./questionCollectionValidation";
-import { ActiveTestAttempt, RuntimeAnswer, RuntimeQuestion, TestAttempt, TestDefinition } from "./testTypes";
-import { buildRuntimeQuestions, calculateAttemptResult, getCategoryOptions, getMatchingQuestions, getSubcategoryOptions } from "./testUtils";
+import { ActiveTestAttempt, RuntimeAnswer, RuntimeQueueItem, TestAttempt, TestDefinition } from "./testTypes";
+import { buildRuntimeQuestions, calculateAttemptResult, getCategoryOptions, getMatchingQuestions, getSubcategoryOptions, isExactSetMatch } from "./testUtils";
 
 type TestFormState = {
   title: string;
@@ -56,12 +56,20 @@ export function TestSection({ t }: { t: Translator }) {
   const [activeAttempt, setActiveAttempt] = useState<ActiveTestAttempt | null>(null);
   const [resultAttempt, setResultAttempt] = useState<{ result: TestAttempt; definition: TestDefinition } | null>(null);
   const [finishWarning, setFinishWarning] = useState("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 3000);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!activeAttempt) return;
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [activeAttempt]);
 
   const bankQuestions = useMemo(() => collection?.questions || [], [collection]);
   const categoryOptions = useMemo(() => getCategoryOptions(bankQuestions), [bankQuestions]);
@@ -201,42 +209,80 @@ export function TestSection({ t }: { t: Translator }) {
       id: `active-${Date.now()}`,
       testId: definition.id,
       startedAt: new Date().toISOString(),
-      questions: runtimeQuestions,
-      answers: {},
-      currentQuestionIndex: 0,
+      queue: runtimeQuestions.map((question, index) => ({
+        queueId: `${question.id}-attempt-1-${index}`,
+        sourceQuestionId: question.id,
+        retryNumber: 0,
+        question,
+      })),
+      originalQuestionCount: runtimeQuestions.length,
+      submittedAnswers: {},
+      draftSelections: {},
+      currentQueueIndex: 0,
     };
     setFinishWarning("");
     setResultAttempt(null);
     setActiveAttempt(nextAttempt);
   };
 
-  const answerCurrent = (question: RuntimeQuestion, optionId: string) => {
+  const selectDraftAnswer = (queueItem: RuntimeQueueItem, optionId: string) => {
     if (!activeAttempt) return;
-    const current = activeAttempt.answers[question.id];
-    let selectedOptionIds = current?.selectedOptionIds || [];
-    if (question.questionType === "single_choice") {
+    if (activeAttempt.submittedAnswers[queueItem.queueId]) return;
+
+    const current = activeAttempt.draftSelections[queueItem.queueId] || [];
+    let selectedOptionIds = current;
+    if (queueItem.question.questionType === "single_choice") {
       selectedOptionIds = [optionId];
     } else {
       selectedOptionIds = selectedOptionIds.includes(optionId)
         ? selectedOptionIds.filter((id) => id !== optionId)
         : [...selectedOptionIds, optionId];
     }
-    const selectedSet = new Set(selectedOptionIds);
-    const isCorrect =
-      selectedOptionIds.length === question.correctOptions.length &&
-      question.correctOptions.every((correctId) => selectedSet.has(correctId));
+
+    setActiveAttempt({
+      ...activeAttempt,
+      draftSelections: {
+        ...activeAttempt.draftSelections,
+        [queueItem.queueId]: selectedOptionIds,
+      },
+    });
+    setFinishWarning("");
+  };
+
+  const submitCurrentAnswer = () => {
+    if (!activeAttempt) return;
+    const queueItem = activeAttempt.queue[activeAttempt.currentQueueIndex];
+    if (!queueItem || activeAttempt.submittedAnswers[queueItem.queueId]) return;
+    const selectedOptionIds = activeAttempt.draftSelections[queueItem.queueId] || [];
+    if (selectedOptionIds.length === 0) return;
+
+    const isCorrect = isExactSetMatch(selectedOptionIds, queueItem.question.correctOptions);
     const runtimeAnswer: RuntimeAnswer = {
       selectedOptionIds,
       isCorrect,
       answeredAt: new Date().toISOString(),
+      attemptNumber: queueItem.retryNumber + 1,
     };
+
+    const nextSubmittedAnswers = {
+      ...activeAttempt.submittedAnswers,
+      [queueItem.queueId]: runtimeAnswer,
+    };
+    const nextQueue = isCorrect
+      ? activeAttempt.queue
+      : [
+          ...activeAttempt.queue,
+          {
+            ...queueItem,
+            queueId: `${queueItem.sourceQuestionId}-attempt-${Date.now()}-${activeAttempt.queue.length}`,
+            retryNumber: queueItem.retryNumber + 1,
+          },
+        ];
 
     setActiveAttempt({
       ...activeAttempt,
-      answers: {
-        ...activeAttempt.answers,
-        [question.id]: runtimeAnswer,
-      },
+      queue: nextQueue,
+      submittedAnswers: nextSubmittedAnswers,
     });
     setFinishWarning("");
   };
@@ -245,8 +291,8 @@ export function TestSection({ t }: { t: Translator }) {
     if (!activeAttempt) return;
     const definition = definitions.find((item) => item.id === activeAttempt.testId);
     if (!definition) return;
-    const unansweredCount = activeAttempt.questions.filter(
-      (question) => !activeAttempt.answers[question.id] || activeAttempt.answers[question.id]?.selectedOptionIds.length === 0,
+    const unansweredCount = activeAttempt.queue.filter(
+      (queueItem) => !activeAttempt.submittedAnswers[queueItem.queueId],
     ).length;
     if (!definition.allowUnanswered && unansweredCount > 0) {
       setFinishWarning(t("test.finishWarning", { count: unansweredCount }));
@@ -279,30 +325,52 @@ export function TestSection({ t }: { t: Translator }) {
   }
 
   if (activeAttempt) {
-    const currentQuestion = activeAttempt.questions[activeAttempt.currentQuestionIndex];
-    const currentAnswer = activeAttempt.answers[currentQuestion.id];
-    const answeredCount = activeAttempt.questions.filter(
-      (question) => activeAttempt.answers[question.id] && activeAttempt.answers[question.id]?.selectedOptionIds.length,
-    ).length;
+    const currentQueueItem = activeAttempt.queue[activeAttempt.currentQueueIndex];
+    const currentQuestion = currentQueueItem.question;
+    const currentAnswer = activeAttempt.submittedAnswers[currentQueueItem.queueId];
+    const currentDraft = activeAttempt.draftSelections[currentQueueItem.queueId] || [];
+    const submittedAnswers = Object.values(activeAttempt.submittedAnswers).filter(Boolean);
+    const correctCount = submittedAnswers.filter((answer) => answer?.isCorrect).length;
+    const wrongCount = submittedAnswers.filter((answer) => answer && !answer.isCorrect).length;
+    const answeredCount = submittedAnswers.length;
+    const activeDefinition = definitions.find((item) => item.id === activeAttempt.testId);
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor((nowMs - new Date(activeAttempt.startedAt).getTime()) / 1000),
+    );
+    const visibleCategory = currentQuestion.questionSubcategory
+      ? `${currentQuestion.questionCategory} / ${currentQuestion.questionSubcategory}`
+      : currentQuestion.questionCategory;
+
     return (
       <div className="test-runner-full">
-        <Card title={definitions.find((item) => item.id === activeAttempt.testId)?.title || t("test.activeTitle")}
-          subtitle={t("test.activeSubtitleNew", {
-            current: activeAttempt.currentQuestionIndex + 1,
-            total: activeAttempt.questions.length,
-          })}
-          className="test-runner-card"
-        >
-          <div className="test-headline">
-            <span className="tag">{t("test.answered", { count: answeredCount, total: activeAttempt.questions.length })}</span>
-            <span className="tag">{currentQuestion.questionCategory}</span>
+        <section className="test-status-bar" aria-label={t("test.activeTitle")}>
+          <div className="test-status-title">
+            <h3>{activeDefinition?.title || t("test.activeTitle")}</h3>
+            <p>{visibleCategory}</p>
           </div>
+          <MetricLine label={t("test.statusQuestion")} value={`${activeAttempt.currentQueueIndex + 1}/${activeAttempt.queue.length}`} />
+          <MetricLine label={t("test.statusCorrect")} value={String(correctCount)} />
+          <MetricLine label={t("test.statusWrong")} value={String(wrongCount)} />
+          <MetricLine label={t("test.statusAnswered")} value={`${answeredCount}/${activeAttempt.queue.length}`} />
+          <MetricLine label={t("test.statusElapsed")} value={formatDuration(elapsedSeconds)} />
+          <MetricLine
+            label={t("test.statusLimit")}
+            value={activeDefinition && activeDefinition.timeLimitMinutes > 0
+              ? t("test.limitMinutes", { minutes: activeDefinition.timeLimitMinutes })
+              : t("test.noTimeLimit")}
+          />
+        </section>
+
+        <Card title={t("test.questionTitle", { number: activeAttempt.currentQueueIndex + 1 })} className="test-runner-card">
           <p className="runner-question">{currentQuestion.question}</p>
-          {currentQuestion.auxiliaryInformation ? <p className="runner-note">{currentQuestion.auxiliaryInformation}</p> : null}
-          <div className="runner-options">
-            {currentQuestion.options.map((option) => {
-              const selected = currentAnswer?.selectedOptionIds.includes(option.id) || false;
-              const hasAnswer = (currentAnswer?.selectedOptionIds.length || 0) > 0;
+          {currentQuestion.auxiliaryInformation ? (
+            <p className="runner-note">{currentQuestion.auxiliaryInformation}</p>
+          ) : null}
+          <div className="runner-options" role="group" aria-label={t("test.answerOptions")}>
+            {currentQuestion.options.map((option, optionIndex) => {
+              const selected = currentDraft.includes(option.id) || currentAnswer?.selectedOptionIds.includes(option.id) || false;
+              const hasAnswer = Boolean(currentAnswer);
               const isCorrectOption = currentQuestion.correctOptions.includes(option.id);
               let className = "runner-option";
               if (selected) className += " selected";
@@ -311,25 +379,22 @@ export function TestSection({ t }: { t: Translator }) {
                 if (selected && !isCorrectOption) className += " incorrect";
               }
               return (
-                <button key={option.id} type="button" className={className} onClick={() => answerCurrent(currentQuestion, option.id)}>
-                  <span className="option-key">{option.id.toUpperCase()}</span>
+                <button key={option.id} type="button" className={className} onClick={() => selectDraftAnswer(currentQueueItem, option.id)}>
+                  <span className="option-key">{getVisibleOptionLabel(optionIndex)}</span>
                   <span>{option.text}</span>
                 </button>
               );
             })}
           </div>
-          {currentAnswer ? (
-            <p className={currentAnswer.isCorrect ? "answer-feedback correct" : "answer-feedback incorrect"}>
-              {currentAnswer.isCorrect ? t("test.instantCorrect") : t("test.instantIncorrect")}
-            </p>
-          ) : null}
-          <div className="card-actions">
-            <Button variant="secondary" onClick={() => setActiveAttempt({ ...activeAttempt, currentQuestionIndex: Math.max(0, activeAttempt.currentQuestionIndex - 1) })} disabled={activeAttempt.currentQuestionIndex === 0}>{t("test.previous")}</Button>
-            <Button variant="secondary" onClick={() => setActiveAttempt({ ...activeAttempt, currentQuestionIndex: Math.min(activeAttempt.questions.length - 1, activeAttempt.currentQuestionIndex + 1) })} disabled={activeAttempt.currentQuestionIndex === activeAttempt.questions.length - 1}>{t("test.next")}</Button>
-            <Button onClick={finishActiveTest}>{t("test.finish")}</Button>
-          </div>
-          {finishWarning ? <p className="field-error">{finishWarning}</p> : null}
         </Card>
+
+        <div className="test-runner-footer">
+          <Button variant="secondary" onClick={() => setActiveAttempt({ ...activeAttempt, currentQueueIndex: Math.max(0, activeAttempt.currentQueueIndex - 1) })} disabled={activeAttempt.currentQueueIndex === 0}>{t("test.previous")}</Button>
+          <Button onClick={submitCurrentAnswer} disabled={currentDraft.length === 0 || Boolean(currentAnswer)}>{t("test.answer")}</Button>
+          <Button variant="secondary" onClick={() => setActiveAttempt({ ...activeAttempt, currentQueueIndex: Math.min(activeAttempt.queue.length - 1, activeAttempt.currentQueueIndex + 1) })} disabled={activeAttempt.currentQueueIndex === activeAttempt.queue.length - 1 || (!activeDefinition?.allowUnanswered && !currentAnswer)}>{t("test.next")}</Button>
+          <Button onClick={finishActiveTest}>{t("test.finish")}</Button>
+        </div>
+        {finishWarning ? <p className="field-error runner-finish-warning">{finishWarning}</p> : null}
       </div>
     );
   }
@@ -339,17 +404,18 @@ export function TestSection({ t }: { t: Translator }) {
     return (
       <div className="view-grid">
         <Card title={t("test.resultsTitle")} subtitle={definition.title}>
-          <div className="bank-summary">
-            <MetricLine label={t("test.startedAt")} value={result.startedAt} />
-            <MetricLine label={t("test.completedAt")} value={result.completedAt} />
-            <MetricLine label={t("test.durationSeconds")} value={String(result.durationSeconds)} />
-            <MetricLine label={t("test.totalQuestionsLabel")} value={String(result.totalQuestions)} />
-            <MetricLine label={t("test.correctAnswers")} value={String(result.correctAnswers)} />
-            <MetricLine label={t("test.incorrectAnswers")} value={String(result.incorrectAnswers)} />
-            <MetricLine label={t("test.unansweredQuestions")} value={String(result.unansweredQuestions)} />
-            <MetricLine label={t("test.rawScore")} value={String(result.rawScore)} />
-            <MetricLine label={t("test.finalScore")} value={String(result.finalScore)} />
-            <MetricLine label={t("test.accuracyPercentage")} value={`${result.accuracyPercentage.toFixed(2)}%`} />
+          <div className="results-meta-line">
+            <span>{t("test.startedFriendly", { value: formatDateTime(result.startedAt) })}</span>
+            <span>{t("test.completedFriendly", { value: formatDateTime(result.completedAt) })}</span>
+          </div>
+
+          <div className="kpi-grid results-kpi-grid">
+            <MetricLine label={t("test.kpiScore")} value={`${result.finalScore.toFixed(2)}`} />
+            <MetricLine label={t("test.kpiAccuracy")} value={`${result.accuracyPercentage.toFixed(2)}%`} />
+            <MetricLine label={t("test.kpiCorrect")} value={String(result.correctAnswers)} />
+            <MetricLine label={t("test.kpiIncorrect")} value={String(result.incorrectAnswers)} />
+            <MetricLine label={t("test.kpiUnanswered")} value={String(result.unansweredQuestions)} />
+            <MetricLine label={t("test.kpiDuration")} value={formatDuration(result.durationSeconds)} />
           </div>
           <div className="card-actions">
             <Button onClick={() => setResultAttempt(null)}>{t("test.returnToHome")}</Button>
@@ -376,7 +442,19 @@ export function TestSection({ t }: { t: Translator }) {
                   <article key={definition.id} className="saved-test-item">
                     <div>
                       <p className="saved-test-title">{definition.title}</p>
-                      <p className="saved-test-meta">{definition.id} · {definition.questionLimit} · {matchingCount}</p>
+                      <p className="saved-test-meta">
+                        {t("test.savedTestMeta", {
+                          questions: definition.questionLimit,
+                          categories: definition.includedCategories.length,
+                          time: definition.timeLimitMinutes > 0
+                            ? t("test.savedTestTimeLimit", { minutes: definition.timeLimitMinutes })
+                            : t("test.savedTestNoTimeLimit"),
+                          negative: definition.negativeMarkingEnabled
+                            ? t("test.savedTestNegativeOn")
+                            : t("test.savedTestNegativeOff"),
+                          matching: matchingCount,
+                        })}
+                      </p>
                     </div>
                     <div className="saved-test-actions">
                       <Button onClick={() => runDefinition(definition)}>{t("test.run")}</Button>
@@ -636,6 +714,22 @@ function MetricLine({ label, value }: { label: string; value: string }) {
       <span className="metric-inline-value">{value}</span>
     </div>
   );
+}
+
+function formatDuration(seconds: number) {
+  const safe = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safe / 60);
+  const remainingSeconds = safe % 60;
+  return `${minutes}m ${String(remainingSeconds).padStart(2, "0")}s`;
+}
+
+function formatDateTime(iso: string) {
+  const date = new Date(iso);
+  return date.toLocaleString();
+}
+
+function getVisibleOptionLabel(index: number) {
+  return String.fromCharCode(65 + index);
 }
 
 function validateDefinitionForm(

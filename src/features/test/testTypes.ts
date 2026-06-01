@@ -33,15 +33,25 @@ export type RuntimeAnswer = {
   selectedOptionIds: string[];
   isCorrect: boolean;
   answeredAt: string;
+  attemptNumber: number;
+};
+
+export type RuntimeQueueItem = {
+  queueId: string;
+  sourceQuestionId: string;
+  retryNumber: number;
+  question: RuntimeQuestion;
 };
 
 export type ActiveTestAttempt = {
   id: string;
   testId: string;
   startedAt: string;
-  questions: RuntimeQuestion[];
-  answers: Record<string, RuntimeAnswer | undefined>;
-  currentQuestionIndex: number;
+  queue: RuntimeQueueItem[];
+  originalQuestionCount: number;
+  submittedAnswers: Record<string, RuntimeAnswer | undefined>;
+  draftSelections: Record<string, string[] | undefined>;
+  currentQueueIndex: number;
 };
 
 export type TestAttempt = {
