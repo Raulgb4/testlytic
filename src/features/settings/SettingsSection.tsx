@@ -3,6 +3,7 @@ import { Translator } from "../../app/types";
 import { Language } from "../../i18n";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
+import "./settings.css";
 
 type ThemeMode = "dark" | "light";
 

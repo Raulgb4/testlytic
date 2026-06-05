@@ -34,6 +34,7 @@ import {
   getFinishSummary,
   isTimeLimitEnabled,
 } from "./testRuntimeUtils";
+import "./test.css";
 
 type TestFormState = {
   title: string;

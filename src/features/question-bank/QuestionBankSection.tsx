@@ -6,6 +6,7 @@ import { Toast } from "../../shared/components/Toast";
 import { QuestionCollectionOnboarding } from "../test/QuestionCollectionOnboarding";
 import { saveQuestionBankExport } from "../test/questionCollectionExport";
 import { saveQuestionCollectionTemplate } from "../test/questionCollectionTemplate";
+import "./question-bank.css";
 import {
   CollectionQuestion,
   QuestionCollection,

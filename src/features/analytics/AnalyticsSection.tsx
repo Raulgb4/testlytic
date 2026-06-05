@@ -8,6 +8,7 @@ import {
   calculateGradeDistribution,
   calculateRecentTrend,
 } from "./analyticsUtils";
+import "./analytics.css";
 
 export function AnalyticsSection({
   t,
