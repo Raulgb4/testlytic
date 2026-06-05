@@ -23,7 +23,10 @@ export function getSubcategoryOptions(questions: CollectionQuestion[], categorie
   return Array.from(set).sort();
 }
 
-export function getMatchingQuestions(definition: TestDefinition, bankQuestions: CollectionQuestion[]) {
+export function getMatchingQuestions(
+  definition: TestDefinition,
+  bankQuestions: CollectionQuestion[],
+) {
   const hasSubcategories = (definition.includedSubcategories || []).length > 0;
   return bankQuestions.filter((question) => {
     if (!definition.includedCategories.includes(question.questionCategory)) {
@@ -34,14 +37,20 @@ export function getMatchingQuestions(definition: TestDefinition, bankQuestions: 
     }
     return Boolean(
       question.questionSubcategory &&
-        definition.includedSubcategories?.includes(question.questionSubcategory),
+      definition.includedSubcategories?.includes(question.questionSubcategory),
     );
   });
 }
 
-export function buildRuntimeQuestions(definition: TestDefinition, bankQuestions: CollectionQuestion[]) {
+export function buildRuntimeQuestions(
+  definition: TestDefinition,
+  bankQuestions: CollectionQuestion[],
+) {
   const matching = getMatchingQuestions(definition, bankQuestions);
-  const limited = shuffleArray(matching).slice(0, Math.min(definition.questionLimit, matching.length));
+  const limited = shuffleArray(matching).slice(
+    0,
+    Math.min(definition.questionLimit, matching.length),
+  );
   return limited.map<RuntimeQuestion>((question) => ({
     id: question.id,
     question: question.question,
@@ -70,7 +79,10 @@ export function calculateAttemptResult(
   let unansweredQuestions = 0;
   let retryCorrectAnswers = 0;
   let retryIncorrectAnswers = 0;
-  const categoryMap = new Map<string, { correct: number; incorrect: number; unanswered: number; total: number }>();
+  const categoryMap = new Map<
+    string,
+    { correct: number; incorrect: number; unanswered: number; total: number }
+  >();
 
   for (const queueItem of activeAttempt.queue) {
     const answer = activeAttempt.submittedAnswers[queueItem.queueId];
@@ -84,7 +96,12 @@ export function calculateAttemptResult(
     const category = queueItem.question.questionSubcategory
       ? `${queueItem.question.questionCategory} / ${queueItem.question.questionSubcategory}`
       : queueItem.question.questionCategory;
-    const current = categoryMap.get(category) ?? { correct: 0, incorrect: 0, unanswered: 0, total: 0 };
+    const current = categoryMap.get(category) ?? {
+      correct: 0,
+      incorrect: 0,
+      unanswered: 0,
+      total: 0,
+    };
     current.total += 1;
 
     if (!answer) {
@@ -112,7 +129,10 @@ export function calculateAttemptResult(
     : correctAnswers;
   const totalQuestions = activeAttempt.originalQuestionCount;
   const accuracyPercentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
-  const gradeOutOf10 = Math.max(0, Math.min(10, totalQuestions > 0 ? (finalScore / totalQuestions) * 10 : 0));
+  const gradeOutOf10 = Math.max(
+    0,
+    Math.min(10, totalQuestions > 0 ? (finalScore / totalQuestions) * 10 : 0),
+  );
 
   return {
     id: `attempt-${Date.now()}`,

@@ -1,17 +1,25 @@
-import { FormEvent, RefObject, useEffect, useId, useMemo, useRef, useState } from "react";
+import { FormEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { Translator } from "../../app/types";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
 import { Toast } from "../../shared/components/Toast";
-import { saveQuestionCollectionTemplate } from "./questionCollectionTemplate";
-import { QuestionCollectionOnboarding } from "./QuestionCollectionOnboarding";
-import { CollectionQuestion, QuestionCollection, ValidationIssue } from "./questionCollectionTypes";
+import { CollectionQuestion, QuestionCollection } from "./questionCollectionTypes";
 import {
-  buildQuestionCollectionSummary,
-  validateQuestionCollectionJson,
-} from "./questionCollectionValidation";
-import { ActiveTestAttempt, CompletedTestAttempt, RuntimeAnswer, RuntimeQueueItem, TestAttempt, TestDefinition } from "./testTypes";
-import { buildRuntimeQuestions, calculateAttemptResult, getCategoryOptions, getMatchingQuestions, getSubcategoryOptions, isExactSetMatch } from "./testUtils";
+  ActiveTestAttempt,
+  CompletedTestAttempt,
+  RuntimeAnswer,
+  RuntimeQueueItem,
+  TestAttempt,
+  TestDefinition,
+} from "./testTypes";
+import {
+  buildRuntimeQuestions,
+  calculateAttemptResult,
+  getCategoryOptions,
+  getMatchingQuestions,
+  getSubcategoryOptions,
+  isExactSetMatch,
+} from "./testUtils";
 
 type TestFormState = {
   title: string;
@@ -37,16 +45,18 @@ const INITIAL_FORM: TestFormState = {
 
 export function TestSection({
   t,
+  collection,
   onCompletedAttempt,
+  onGoToQuestionBank,
 }: {
   t: Translator;
+  collection: QuestionCollection | null;
   onCompletedAttempt: (attempt: CompletedTestAttempt) => void;
+  onGoToQuestionBank: () => void;
 }) {
-  const importMoreInputId = useId();
-  const importMoreInputRef = useRef<HTMLInputElement | null>(null);
-  const [collection, setCollection] = useState<QuestionCollection | null>(null);
-  const [validationErrors, setValidationErrors] = useState<ValidationIssue[]>([]);
-  const [toast, setToast] = useState<null | { message: string; variant: "success" | "error" }>(null);
+  const [toast, setToast] = useState<null | { message: string; variant: "success" | "error" }>(
+    null,
+  );
   const [definitions, setDefinitions] = useState<TestDefinition[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [formState, setFormState] = useState<TestFormState>(INITIAL_FORM);
@@ -58,9 +68,11 @@ export function TestSection({
   const timeLimitInputRef = useRef<HTMLInputElement | null>(null);
   const penaltyInputRef = useRef<HTMLInputElement | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TestDefinition | null>(null);
-  const [importMoreOpen, setImportMoreOpen] = useState(false);
   const [activeAttempt, setActiveAttempt] = useState<ActiveTestAttempt | null>(null);
-  const [resultAttempt, setResultAttempt] = useState<{ result: TestAttempt; definition: TestDefinition } | null>(null);
+  const [resultAttempt, setResultAttempt] = useState<{
+    result: TestAttempt;
+    definition: TestDefinition;
+  } | null>(null);
   const [finishWarning, setFinishWarning] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -110,55 +122,6 @@ export function TestSection({
       };
     });
   }, [bankQuestions, categoryOptions, formOpen]);
-
-  const importCollectionFile = async (file: File) => {
-    const raw = await file.text();
-    const validation = validateQuestionCollectionJson(raw);
-    if (!validation.ok) {
-      setValidationErrors(validation.errors);
-      return;
-    }
-    if (importMoreOpen && collection) {
-      const existingIds = new Set(collection.questions.map((question) => question.id));
-      const duplicateErrors = validation.collection.questions
-        .filter((question) => existingIds.has(question.id))
-        .map((question) => ({
-          path: `questions.${question.id}`,
-          message: "Question ID already exists in the current question bank.",
-        }));
-
-      if (duplicateErrors.length > 0) {
-        setValidationErrors(duplicateErrors);
-        return;
-      }
-
-      const mergedQuestions = [...collection.questions, ...validation.collection.questions];
-      setCollection({
-        version: collection.version,
-        importedAt: new Date().toISOString(),
-        questions: mergedQuestions,
-        summary: buildQuestionCollectionSummary(mergedQuestions),
-      });
-      setValidationErrors([]);
-      setImportMoreOpen(false);
-      return;
-    }
-
-    setCollection(validation.collection);
-    setValidationErrors([]);
-    setImportMoreOpen(false);
-  };
-
-  const handleDownloadTemplate = async () => {
-    const result = await saveQuestionCollectionTemplate();
-    if (result.status === "saved") {
-      setToast({ message: t("test.templateSavedSuccess"), variant: "success" });
-      return;
-    }
-    if (result.status === "error") {
-      setToast({ message: t("test.templateSavedError"), variant: "error" });
-    }
-  };
 
   const openCreate = () => {
     setEditingTestId(null);
@@ -299,8 +262,9 @@ export function TestSection({
     if (!queueItem || activeAttempt.submittedAnswers[queueItem.queueId]) return;
     const selectedOptionIds = activeAttempt.draftSelections[queueItem.queueId] || [];
 
-    const isCorrect = selectedOptionIds.length > 0
-      && isExactSetMatch(selectedOptionIds, queueItem.question.correctOptions);
+    const isCorrect =
+      selectedOptionIds.length > 0 &&
+      isExactSetMatch(selectedOptionIds, queueItem.question.correctOptions);
     const runtimeAnswer: RuntimeAnswer = {
       selectedOptionIds,
       isCorrect,
@@ -358,7 +322,8 @@ export function TestSection({
     const definition = definitions.find((item) => item.id === activeAttempt.testId);
     if (!definition) return;
     const unansweredOriginalCount = activeAttempt.queue.filter(
-      (queueItem) => queueItem.retryNumber === 0 && !activeAttempt.submittedAnswers[queueItem.queueId],
+      (queueItem) =>
+        queueItem.retryNumber === 0 && !activeAttempt.submittedAnswers[queueItem.queueId],
     ).length;
     if (!definition.allowUnanswered && unansweredOriginalCount > 0) {
       setFinishWarning(t("test.finishWarning", { count: unansweredOriginalCount }));
@@ -372,22 +337,18 @@ export function TestSection({
 
   if (!collection) {
     return (
-      <>
-        <QuestionCollectionOnboarding
-          t={t}
-          errors={validationErrors}
-          onDownloadTemplate={handleDownloadTemplate}
-          onImportFile={importCollectionFile}
-        />
-        {toast ? (
-          <Toast
-            message={toast.message}
-            variant={toast.variant}
-            onClose={() => setToast(null)}
-            closeLabel={t("test.toastClose")}
-          />
-        ) : null}
-      </>
+      <div className="test-empty-state-wrap">
+        <Card
+          title={t("test.emptyQuestionBankTitle")}
+          subtitle={t("test.emptyQuestionBankSubtitle")}
+          className="test-empty-state-card"
+        >
+          <p className="placeholder-note">{t("test.emptyQuestionBankBody")}</p>
+          <div className="test-empty-state-action">
+            <Button onClick={onGoToQuestionBank}>{t("test.goToQuestionBank")}</Button>
+          </div>
+        </Card>
+      </div>
     );
   }
 
@@ -416,14 +377,20 @@ export function TestSection({
       Math.floor((nowMs - new Date(activeAttempt.startedAt).getTime()) / 1000),
     );
     const timeUrgency = getTimeUrgency(elapsedSeconds, activeDefinition?.timeLimitMinutes || 0);
-    const visibleQuestionPosition = Math.min(activeAttempt.currentQueueIndex + 1, activeAttempt.originalQuestionCount);
+    const visibleQuestionPosition = Math.min(
+      activeAttempt.currentQueueIndex + 1,
+      activeAttempt.originalQuestionCount,
+    );
     const visibleCategory = currentQuestion.questionSubcategory
       ? `${currentQuestion.questionCategory} / ${currentQuestion.questionSubcategory}`
       : currentQuestion.questionCategory;
 
     return (
       <div className="test-runner-full">
-        <section className={`test-exam-header time-${timeUrgency}`} aria-label={t("test.activeTitle")}>
+        <section
+          className={`test-exam-header time-${timeUrgency}`}
+          aria-label={t("test.activeTitle")}
+        >
           <div className="test-exam-header-main">
             <div className="test-exam-title-block">
               <h3>{activeDefinition?.title || t("test.activeTitle")}</h3>
@@ -439,29 +406,43 @@ export function TestSection({
           </div>
 
           <div className="test-exam-stats">
-            <MetricLine label={t("test.statusQuestion")} value={`${visibleQuestionPosition}/${activeAttempt.originalQuestionCount}`} />
-            <MetricLine label={t("test.statusAnswered")} value={`${originalCounters.answered}/${originalCounters.total}`} />
+            <MetricLine
+              label={t("test.statusQuestion")}
+              value={`${visibleQuestionPosition}/${activeAttempt.originalQuestionCount}`}
+            />
+            <MetricLine
+              label={t("test.statusAnswered")}
+              value={`${originalCounters.answered}/${originalCounters.total}`}
+            />
             <MetricLine label={t("test.statusCorrect")} value={String(originalCounters.correct)} />
             <MetricLine label={t("test.statusWrong")} value={String(originalCounters.wrong)} />
             <MetricLine label={t("test.statusElapsed")} value={formatDuration(elapsedSeconds)} />
             <MetricLine
               label={t("test.statusLimit")}
-              value={activeDefinition && activeDefinition.timeLimitMinutes > 0
-                ? t("test.limitMinutes", { minutes: activeDefinition.timeLimitMinutes })
-                : t("test.noTimeLimit")}
+              value={
+                activeDefinition && activeDefinition.timeLimitMinutes > 0
+                  ? t("test.limitMinutes", { minutes: activeDefinition.timeLimitMinutes })
+                  : t("test.noTimeLimit")
+              }
               className={timeUrgency === "normal" ? undefined : "time-metric"}
             />
           </div>
         </section>
 
-        <Card title={t("test.questionTitle", { number: activeAttempt.currentQueueIndex + 1 })} className="test-runner-card">
+        <Card
+          title={t("test.questionTitle", { number: activeAttempt.currentQueueIndex + 1 })}
+          className="test-runner-card"
+        >
           <p className="runner-question">{currentQuestion.question}</p>
           {currentQuestion.auxiliaryInformation ? (
             <p className="runner-note">{currentQuestion.auxiliaryInformation}</p>
           ) : null}
           <div className="runner-options" role="group" aria-label={t("test.answerOptions")}>
             {currentQuestion.options.map((option, optionIndex) => {
-              const selected = currentDraft.includes(option.id) || currentAnswer?.selectedOptionIds.includes(option.id) || false;
+              const selected =
+                currentDraft.includes(option.id) ||
+                currentAnswer?.selectedOptionIds.includes(option.id) ||
+                false;
               const hasAnswer = hasSubmittedCurrentAnswer;
               const isCorrectOption = currentQuestion.correctOptions.includes(option.id);
               let className = "runner-option";
@@ -471,7 +452,12 @@ export function TestSection({
                 if (selected && !isCorrectOption) className += " incorrect";
               }
               return (
-                <button key={option.id} type="button" className={className} onClick={() => selectDraftAnswer(currentQueueItem, option.id)}>
+                <button
+                  key={option.id}
+                  type="button"
+                  className={className}
+                  onClick={() => selectDraftAnswer(currentQueueItem, option.id)}
+                >
                   <span className="option-key">{getVisibleOptionLabel(optionIndex)}</span>
                   <span>{option.text}</span>
                 </button>
@@ -481,18 +467,22 @@ export function TestSection({
 
           <div className="test-runner-footer">
             {activeAttempt.currentQueueIndex > 0 ? (
-              <Button variant="secondary" onClick={goToPreviousQuestion}>{t("test.previous")}</Button>
+              <Button variant="secondary" onClick={goToPreviousQuestion}>
+                {t("test.previous")}
+              </Button>
             ) : null}
-            {showAnswer ? (
-              <Button onClick={submitCurrentAnswer}>{t("test.answer")}</Button>
-            ) : null}
+            {showAnswer ? <Button onClick={submitCurrentAnswer}>{t("test.answer")}</Button> : null}
             {showNext ? (
-              <Button variant="secondary" onClick={goToNextQuestion}>{t("test.next")}</Button>
+              <Button variant="secondary" onClick={goToNextQuestion}>
+                {t("test.next")}
+              </Button>
             ) : null}
             <Button onClick={finishActiveTest}>{t("test.finish")}</Button>
           </div>
         </Card>
-        {finishWarning ? <p className="field-error runner-finish-warning">{finishWarning}</p> : null}
+        {finishWarning ? (
+          <p className="field-error runner-finish-warning">{finishWarning}</p>
+        ) : null}
       </div>
     );
   }
@@ -501,22 +491,46 @@ export function TestSection({
     const { result, definition } = resultAttempt;
     return (
       <div className="view-grid results-view">
-        <Card title={t("test.finalGrade")} subtitle={definition.title} className="results-hero-card">
+        <Card
+          title={t("test.finalGrade")}
+          subtitle={definition.title}
+          className="results-hero-card"
+        >
           <p className="results-grade">{result.gradeOutOf10.toFixed(1)} / 10</p>
           <div className="results-meta-line">
-            <span>{t("test.completedFriendly", { value: formatDateTime(result.completedAt) })}</span>
-            <span>{t("test.kpiDuration")}: {formatDuration(result.durationSeconds)}</span>
+            <span>
+              {t("test.completedFriendly", { value: formatDateTime(result.completedAt) })}
+            </span>
+            <span>
+              {t("test.kpiDuration")}: {formatDuration(result.durationSeconds)}
+            </span>
           </div>
         </Card>
 
-        <Card title={t("test.resultsTitle")} subtitle={t("test.resultsSubtitle") } className="results-summary-card">
+        <Card
+          title={t("test.resultsTitle")}
+          subtitle={t("test.resultsSubtitle")}
+          className="results-summary-card"
+        >
           <div className="kpi-grid results-kpi-grid">
-            <MetricLine label={t("test.finalScoreFriendly")} value={`${result.finalScore.toFixed(2)}`} />
-            <MetricLine label={t("test.kpiAccuracy")} value={`${result.accuracyPercentage.toFixed(2)}%`} />
+            <MetricLine
+              label={t("test.finalScoreFriendly")}
+              value={`${result.finalScore.toFixed(2)}`}
+            />
+            <MetricLine
+              label={t("test.kpiAccuracy")}
+              value={`${result.accuracyPercentage.toFixed(2)}%`}
+            />
             <MetricLine label={t("test.kpiCorrect")} value={String(result.correctAnswers)} />
             <MetricLine label={t("test.kpiIncorrect")} value={String(result.incorrectAnswers)} />
-            <MetricLine label={t("test.kpiUnanswered")} value={String(result.unansweredQuestions)} />
-            <MetricLine label={t("test.kpiDuration")} value={formatDuration(result.durationSeconds)} />
+            <MetricLine
+              label={t("test.kpiUnanswered")}
+              value={String(result.unansweredQuestions)}
+            />
+            <MetricLine
+              label={t("test.kpiDuration")}
+              value={formatDuration(result.durationSeconds)}
+            />
           </div>
           <div className="retry-summary">
             <MetricLine label={t("test.retryAttempts")} value={String(result.retryAttempts)} />
@@ -536,12 +550,20 @@ export function TestSection({
     <div className="view-grid test-home-grid">
       <div className="test-home-content">
         <div className="configure-cta-wrap">
-          <button type="button" className="configure-cta" onClick={openCreate}>{t("test.configureNewTest")}</button>
+          <button type="button" className="configure-cta" onClick={openCreate}>
+            {t("test.configureNewTest")}
+          </button>
         </div>
 
-        <Card title={t("test.savedTests")} subtitle={t("test.workspaceSubtitle")} className="test-home-card saved-tests-card">
+        <Card
+          title={t("test.savedTests")}
+          subtitle={t("test.workspaceSubtitle")}
+          className="test-home-card saved-tests-card"
+        >
           <div className="saved-tests-section">
-            {definitions.length === 0 ? <p className="placeholder-note">{t("test.noSavedTests")}</p> : null}
+            {definitions.length === 0 ? (
+              <p className="placeholder-note">{t("test.noSavedTests")}</p>
+            ) : null}
             <div className="saved-tests-list">
               {definitions.map((definition) => {
                 const matchingCount = getMatchingQuestions(definition, collection.questions).length;
@@ -553,9 +575,12 @@ export function TestSection({
                         {t("test.savedTestMeta", {
                           questions: definition.questionLimit,
                           categories: definition.includedCategories.length,
-                          time: definition.timeLimitMinutes > 0
-                            ? t("test.savedTestTimeLimit", { minutes: definition.timeLimitMinutes })
-                            : t("test.savedTestNoTimeLimit"),
+                          time:
+                            definition.timeLimitMinutes > 0
+                              ? t("test.savedTestTimeLimit", {
+                                  minutes: definition.timeLimitMinutes,
+                                })
+                              : t("test.savedTestNoTimeLimit"),
                           negative: definition.negativeMarkingEnabled
                             ? t("test.savedTestNegativeOn")
                             : t("test.savedTestNegativeOff"),
@@ -565,8 +590,12 @@ export function TestSection({
                     </div>
                     <div className="saved-test-actions">
                       <Button onClick={() => runDefinition(definition)}>{t("test.run")}</Button>
-                      <Button variant="secondary" onClick={() => openEdit(definition)}>{t("test.edit")}</Button>
-                      <Button variant="secondary" onClick={() => setDeleteTarget(definition)}>{t("test.delete")}</Button>
+                      <Button variant="secondary" onClick={() => openEdit(definition)}>
+                        {t("test.edit")}
+                      </Button>
+                      <Button variant="secondary" onClick={() => setDeleteTarget(definition)}>
+                        {t("test.delete")}
+                      </Button>
                     </div>
                   </article>
                 );
@@ -574,26 +603,19 @@ export function TestSection({
             </div>
           </div>
         </Card>
-
-        <Card title={t("test.collectionSummaryTitle")} subtitle={t("test.collectionSummarySubtitle")} className="test-home-card question-summary-card">
-          <div className="bank-summary">
-            <MetricLine label={t("test.questions")} value={String(collection.summary.totalQuestions)} />
-            <MetricLine label={t("test.topicCategories")} value={String(collection.summary.totalCategories)} />
-            <MetricLine label={t("test.collectionSubcategories")} value={String(collection.summary.totalSubcategories)} />
-            <MetricLine label={t("test.collectionSingleChoice")} value={String(collection.summary.totalSingleChoice)} />
-            <MetricLine label={t("test.collectionMultipleChoice")} value={String(collection.summary.totalMultipleChoice)} />
-            <MetricLine label={t("test.lastUpdated")} value={new Date(collection.importedAt).toLocaleString()} />
-          </div>
-          <div className="summary-import-action">
-            <Button variant="secondary" onClick={() => setImportMoreOpen(true)}>{t("test.importMoreQuestions")}</Button>
-          </div>
-        </Card>
       </div>
 
       {formOpen ? (
         <div className="settings-modal-backdrop" role="presentation">
-          <div className="settings-modal test-definition-modal" role="dialog" aria-modal="true" aria-labelledby="test-definition-title">
-            <h3 id="test-definition-title">{editingTestId ? t("test.editTest") : t("test.createTest")}</h3>
+          <div
+            className="settings-modal test-definition-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="test-definition-title"
+          >
+            <h3 id="test-definition-title">
+              {editingTestId ? t("test.editTest") : t("test.createTest")}
+            </h3>
             <form className="test-definition-form" onSubmit={saveDefinition} noValidate>
               <div className="test-definition-body">
                 <section className="test-form-section">
@@ -604,10 +626,14 @@ export function TestSection({
                       ref={titleInputRef}
                       className="input"
                       value={formState.title}
-                      onChange={(event) => setFormState({ ...formState, title: event.target.value })}
+                      onChange={(event) =>
+                        setFormState({ ...formState, title: event.target.value })
+                      }
                       aria-invalid={showErrors && Boolean(formValidation.errors.title)}
                     />
-                    {showErrors && formValidation.errors.title ? <small className="field-error">{formValidation.errors.title}</small> : null}
+                    {showErrors && formValidation.errors.title ? (
+                      <small className="field-error">{formValidation.errors.title}</small>
+                    ) : null}
                   </label>
 
                   <label className="field">
@@ -618,14 +644,25 @@ export function TestSection({
                       type="number"
                       min={1}
                       value={formState.questionLimit}
-                      onChange={(event) => setFormState({ ...formState, questionLimit: Number(event.target.value || 1) })}
+                      onChange={(event) =>
+                        setFormState({
+                          ...formState,
+                          questionLimit: Number(event.target.value || 1),
+                        })
+                      }
                       aria-invalid={showErrors && Boolean(formValidation.errors.questionLimit)}
                     />
-                    {showErrors && formValidation.errors.questionLimit ? <small className="field-error">{formValidation.errors.questionLimit}</small> : null}
-                    {formValidation.matchingCount > 0 ? (
-                      <small className="field-hint">{t("test.matchingCount", { count: formValidation.matchingCount })}</small>
+                    {showErrors && formValidation.errors.questionLimit ? (
+                      <small className="field-error">{formValidation.errors.questionLimit}</small>
                     ) : null}
-                    {formValidation.limitWarning ? <small className="field-warning">{formValidation.limitWarning}</small> : null}
+                    {formValidation.matchingCount > 0 ? (
+                      <small className="field-hint">
+                        {t("test.matchingCount", { count: formValidation.matchingCount })}
+                      </small>
+                    ) : null}
+                    {formValidation.limitWarning ? (
+                      <small className="field-warning">{formValidation.limitWarning}</small>
+                    ) : null}
                   </label>
                 </section>
 
@@ -639,7 +676,9 @@ export function TestSection({
                     onChange={updateIncludedCategories}
                     triggerRef={categoriesTriggerRef}
                     error={showErrors ? formValidation.errors.includedCategories : undefined}
-                    selectedCountLabel={t("test.selectedCount", { count: formState.includedCategories.length })}
+                    selectedCountLabel={t("test.selectedCount", {
+                      count: formState.includedCategories.length,
+                    })}
                     clearLabel={t("test.clearAll")}
                     selectAllLabel={t("test.selectAllCategories")}
                     onSelectAll={() => updateIncludedCategories(categoryOptions)}
@@ -654,10 +693,14 @@ export function TestSection({
                     onChange={(next) => setFormState({ ...formState, includedSubcategories: next })}
                     disabled={formState.includedCategories.length === 0}
                     disabledText={t("test.selectCategoryFirst")}
-                    selectedCountLabel={t("test.selectedCount", { count: formState.includedSubcategories.length })}
+                    selectedCountLabel={t("test.selectedCount", {
+                      count: formState.includedSubcategories.length,
+                    })}
                     clearLabel={t("test.clearAll")}
                     selectAllLabel={t("test.selectAllCategories")}
-                    onSelectAll={() => setFormState({ ...formState, includedSubcategories: subcategoryOptions })}
+                    onSelectAll={() =>
+                      setFormState({ ...formState, includedSubcategories: subcategoryOptions })
+                    }
                     closeLabel={t("test.close")}
                   />
                 </section>
@@ -672,17 +715,28 @@ export function TestSection({
                       type="number"
                       min={0}
                       value={formState.timeLimitMinutes}
-                      onChange={(event) => setFormState({ ...formState, timeLimitMinutes: Number(event.target.value || 0) })}
+                      onChange={(event) =>
+                        setFormState({
+                          ...formState,
+                          timeLimitMinutes: Number(event.target.value || 0),
+                        })
+                      }
                       aria-invalid={showErrors && Boolean(formValidation.errors.timeLimitMinutes)}
                     />
-                    {showErrors && formValidation.errors.timeLimitMinutes ? <small className="field-error">{formValidation.errors.timeLimitMinutes}</small> : null}
+                    {showErrors && formValidation.errors.timeLimitMinutes ? (
+                      <small className="field-error">
+                        {formValidation.errors.timeLimitMinutes}
+                      </small>
+                    ) : null}
                   </label>
 
                   <label className="field-inline">
                     <input
                       type="checkbox"
                       checked={formState.allowUnanswered}
-                      onChange={(event) => setFormState({ ...formState, allowUnanswered: event.target.checked })}
+                      onChange={(event) =>
+                        setFormState({ ...formState, allowUnanswered: event.target.checked })
+                      }
                     />
                     <span>{t("test.allowUnanswered")}</span>
                   </label>
@@ -691,12 +745,18 @@ export function TestSection({
                     <input
                       type="checkbox"
                       checked={formState.negativeMarkingEnabled}
-                      onChange={(event) => setFormState({ ...formState, negativeMarkingEnabled: event.target.checked })}
+                      onChange={(event) =>
+                        setFormState({ ...formState, negativeMarkingEnabled: event.target.checked })
+                      }
                     />
                     <span>{t("test.negativeMarking")}</span>
                   </label>
 
-                  <div className={formState.negativeMarkingEnabled ? "penalty-reveal show" : "penalty-reveal"}>
+                  <div
+                    className={
+                      formState.negativeMarkingEnabled ? "penalty-reveal show" : "penalty-reveal"
+                    }
+                  >
                     <label className="field">
                       <span>{t("test.penaltyPerIncorrectAnswer")}</span>
                       <input
@@ -706,10 +766,21 @@ export function TestSection({
                         min={0}
                         step={0.05}
                         value={formState.penaltyPerIncorrectAnswer}
-                        onChange={(event) => setFormState({ ...formState, penaltyPerIncorrectAnswer: Number(event.target.value || 0) })}
-                        aria-invalid={showErrors && Boolean(formValidation.errors.penaltyPerIncorrectAnswer)}
+                        onChange={(event) =>
+                          setFormState({
+                            ...formState,
+                            penaltyPerIncorrectAnswer: Number(event.target.value || 0),
+                          })
+                        }
+                        aria-invalid={
+                          showErrors && Boolean(formValidation.errors.penaltyPerIncorrectAnswer)
+                        }
                       />
-                      {showErrors && formValidation.errors.penaltyPerIncorrectAnswer ? <small className="field-error">{formValidation.errors.penaltyPerIncorrectAnswer}</small> : null}
+                      {showErrors && formValidation.errors.penaltyPerIncorrectAnswer ? (
+                        <small className="field-error">
+                          {formValidation.errors.penaltyPerIncorrectAnswer}
+                        </small>
+                      ) : null}
                     </label>
                   </div>
                 </section>
@@ -722,7 +793,11 @@ export function TestSection({
               ) : null}
 
               <footer className="test-definition-footer">
-                <button type="button" className="btn btn-secondary modal-action-btn" onClick={() => setFormOpen(false)}>
+                <button
+                  type="button"
+                  className="btn btn-secondary modal-action-btn"
+                  onClick={() => setFormOpen(false)}
+                >
                   {t("test.cancel")}
                 </button>
                 <button type="submit" className="btn btn-primary modal-action-btn">
@@ -740,76 +815,45 @@ export function TestSection({
             <h3>{t("test.deleteTestConfirmTitle")}</h3>
             <p>{t("test.deleteTestConfirmBody", { title: deleteTarget.title })}</p>
             <div className="settings-modal-actions">
-              <Button onClick={() => { setDefinitions((current) => current.filter((item) => item.id !== deleteTarget.id)); setDeleteTarget(null); }}>{t("settings.confirm")}</Button>
-              <Button variant="secondary" onClick={() => setDeleteTarget(null)}>{t("test.cancel")}</Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {importMoreOpen ? (
-        <div className="settings-modal-backdrop" role="presentation">
-          <div className="settings-modal import-more-modal" role="dialog" aria-modal="true">
-            <h3>{t("test.importMoreQuestions")}</h3>
-            <p>{t("test.importMoreDescription")}</p>
-
-            <div className="import-more-actions" aria-label={t("test.collectionActionsLabel")}>
-              <Button variant="secondary" onClick={() => void handleDownloadTemplate()}>
-                {t("test.downloadTemplate")}
+              <Button
+                onClick={() => {
+                  setDefinitions((current) =>
+                    current.filter((item) => item.id !== deleteTarget.id),
+                  );
+                  setDeleteTarget(null);
+                }}
+              >
+                {t("settings.confirm")}
               </Button>
-              <Button onClick={() => importMoreInputRef.current?.click()}>
-                {t("test.importCollection")}
-              </Button>
-              <Button variant="secondary" onClick={() => {
-                setImportMoreOpen(false);
-                setValidationErrors([]);
-              }}>
+              <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
                 {t("test.cancel")}
               </Button>
             </div>
-
-            <input
-              id={importMoreInputId}
-              ref={importMoreInputRef}
-              className="collection-file-input"
-              type="file"
-              accept="application/json,.json"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void importCollectionFile(file);
-                event.currentTarget.value = "";
-              }}
-            />
-
-            {validationErrors.length > 0 ? (
-              <div className="collection-errors import-more-errors" role="alert" aria-live="polite">
-                <p className="collection-errors-title">{t("test.importErrorsTitle")}</p>
-                <ul className="collection-errors-list">
-                  {validationErrors.slice(0, 6).map((error) => (
-                    <li key={`${error.path}-${error.message}`}>
-                      <strong>{error.path}</strong>: {error.message}
-                    </li>
-                  ))}
-                </ul>
-                {validationErrors.length > 6 ? (
-                  <p className="collection-errors-more">
-                    {t("test.importErrorsMore", { shown: 6, total: validationErrors.length })}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
           </div>
         </div>
       ) : null}
 
       {toast ? (
-        <Toast message={toast.message} variant={toast.variant} onClose={() => setToast(null)} closeLabel={t("test.toastClose")} />
+        <Toast
+          message={toast.message}
+          variant={toast.variant}
+          onClose={() => setToast(null)}
+          closeLabel={t("test.toastClose")}
+        />
       ) : null}
     </div>
   );
 }
 
-function MetricLine({ label, value, className }: { label: string; value: string; className?: string }) {
+function MetricLine({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
   return (
     <div className={className ? `metric-inline ${className}` : "metric-inline"}>
       <span className="metric-inline-label">{label}</span>
@@ -893,16 +937,14 @@ function calculateLiveGrade(activeAttempt: ActiveTestAttempt, definition: TestDe
   const finalScore = definition.negativeMarkingEnabled
     ? counters.correct - counters.incorrect * definition.penaltyPerIncorrectAnswer
     : counters.correct;
-  const grade = activeAttempt.originalQuestionCount > 0
-    ? (finalScore / activeAttempt.originalQuestionCount) * 10
-    : 0;
+  const grade =
+    activeAttempt.originalQuestionCount > 0
+      ? (finalScore / activeAttempt.originalQuestionCount) * 10
+      : 0;
   return Math.max(0, Math.min(10, grade));
 }
 
-function validateDefinitionForm(
-  form: TestFormState,
-  bankQuestions: CollectionQuestion[],
-) {
+function validateDefinitionForm(form: TestFormState, bankQuestions: CollectionQuestion[]) {
   const errors: Record<string, string> = {};
   if (!form.title.trim()) errors.title = "Title is required.";
   if (!Number.isInteger(form.questionLimit) || form.questionLimit < 1) {

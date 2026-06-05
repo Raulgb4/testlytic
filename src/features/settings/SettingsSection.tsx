@@ -131,8 +131,17 @@ export function SettingsSection({
       </Card>
 
       {confirmAction ? (
-        <div className="settings-modal-backdrop" role="presentation" onClick={() => setConfirmAction(null)}>
-          <div className="settings-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="settings-modal-backdrop"
+          role="presentation"
+          onClick={() => setConfirmAction(null)}
+        >
+          <div
+            className="settings-modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
             <h3>{t("settings.confirmModalTitle")}</h3>
             <p>
               {confirmAction === "answers"

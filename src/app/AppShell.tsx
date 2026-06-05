@@ -1,6 +1,8 @@
 import appLogo from "../assets/logo/NEW LOGO.png";
 import { AnalyticsSection } from "../features/analytics/AnalyticsSection";
+import { QuestionBankSection } from "../features/question-bank/QuestionBankSection";
 import { SettingsSection } from "../features/settings/SettingsSection";
+import { QuestionCollection, ValidationIssue } from "../features/test/questionCollectionTypes";
 import { TestSection } from "../features/test/TestSection";
 import { CompletedTestAttempt } from "../features/test/testTypes";
 import { Language } from "../i18n";
@@ -18,6 +20,10 @@ export function AppShell({
   setTheme,
   language,
   setLanguage,
+  collection,
+  validationErrors,
+  onImportCollectionFile,
+  onClearValidationErrors,
   completedAttempts,
   onAddCompletedAttempt,
   onDeleteAllCompletedTests,
@@ -29,6 +35,10 @@ export function AppShell({
   setTheme: (theme: ThemeMode) => void;
   language: Language;
   setLanguage: (language: Language) => void;
+  collection: QuestionCollection | null;
+  validationErrors: ValidationIssue[];
+  onImportCollectionFile: (file: File, merge?: boolean) => Promise<boolean>;
+  onClearValidationErrors: () => void;
   completedAttempts: CompletedTestAttempt[];
   onAddCompletedAttempt: (attempt: CompletedTestAttempt) => void;
   onDeleteAllCompletedTests: () => void;
@@ -63,7 +73,10 @@ export function AppShell({
             section === "analytics" ? "content-area analytics-content-area" : "content-area"
           }
         >
-          {section !== "analytics" && section !== "settings" && section !== "test" ? (
+          {section !== "analytics" &&
+          section !== "settings" &&
+          section !== "test" &&
+          section !== "questionBank" ? (
             <header className="content-header">
               <div>
                 <h2>{activeItem ? t(activeItem.labelKey) : ""}</h2>
@@ -73,12 +86,25 @@ export function AppShell({
             </header>
           ) : null}
 
-          {section === "test" ? <TestSection t={t} onCompletedAttempt={onAddCompletedAttempt} /> : null}
-          {section === "analytics" ? (
-            <AnalyticsSection
+          {section === "questionBank" ? (
+            <QuestionBankSection
               t={t}
-              completedAttempts={completedAttempts}
+              collection={collection}
+              validationErrors={validationErrors}
+              onImportFile={onImportCollectionFile}
+              onClearValidationErrors={onClearValidationErrors}
             />
+          ) : null}
+          {section === "test" ? (
+            <TestSection
+              t={t}
+              collection={collection}
+              onCompletedAttempt={onAddCompletedAttempt}
+              onGoToQuestionBank={() => setSection("questionBank")}
+            />
+          ) : null}
+          {section === "analytics" ? (
+            <AnalyticsSection t={t} completedAttempts={completedAttempts} />
           ) : null}
           {section === "settings" ? (
             <SettingsSection

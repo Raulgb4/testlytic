@@ -40,10 +40,7 @@ function downloadWithAnchor(fileName: string, json: string) {
   URL.revokeObjectURL(url);
 }
 
-export async function saveQuestionCollectionTemplate(
-  fileName = QUESTION_COLLECTION_TEMPLATE_FILE_NAME,
-) {
-  const json = buildQuestionCollectionTemplateJson();
+export async function saveJsonFile(fileName: string, json: string) {
   try {
     const selectedPath = await save({
       defaultPath: fileName,
@@ -60,4 +57,11 @@ export async function saveQuestionCollectionTemplate(
       return { status: "error" as const };
     }
   }
+}
+
+export async function saveQuestionCollectionTemplate(
+  fileName = QUESTION_COLLECTION_TEMPLATE_FILE_NAME,
+) {
+  const json = buildQuestionCollectionTemplateJson();
+  return saveJsonFile(fileName, json);
 }

@@ -233,7 +233,13 @@ export function validateQuestionCollectionJson(raw: string): ValidationResult {
     }
 
     const hasBlockingError = errors.some((error) => error.path.startsWith(path));
-    if (!hasBlockingError && id && prompt && category && (type === "single_choice" || type === "multiple_choice")) {
+    if (
+      !hasBlockingError &&
+      id &&
+      prompt &&
+      category &&
+      (type === "single_choice" || type === "multiple_choice")
+    ) {
       normalizedQuestions.push({
         id,
         question: prompt,

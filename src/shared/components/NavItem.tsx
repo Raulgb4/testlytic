@@ -1,11 +1,30 @@
 type NavItemProps = {
   label: string;
-  icon: "test" | "analytics" | "settings";
+  icon: "questionBank" | "test" | "analytics" | "settings";
   active: boolean;
   onClick: () => void;
 };
 
-function NavIcon({ icon }: { icon: "test" | "analytics" | "settings" }) {
+function NavIcon({ icon }: { icon: "questionBank" | "test" | "analytics" | "settings" }) {
+  if (icon === "questionBank") {
+    return (
+      <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v16H7.5A2.5 2.5 0 0 0 5 21.5v-16Z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M8.5 7H16M8.5 10.5H16M8.5 14H13"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
+
   if (icon === "test") {
     return (
       <svg className="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">

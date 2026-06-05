@@ -15,22 +15,27 @@ export function calculateAnalyticsSummary(attempts: CompletedTestAttempt[]) {
   return {
     testsCompleted,
     averageGrade: testsCompleted > 0 ? totalGrade / testsCompleted : 0,
-    bestGrade: testsCompleted > 0 ? Math.max(...attempts.map((attempt) => attempt.gradeOutOf10)) : 0,
-    worstGrade: testsCompleted > 0 ? Math.min(...attempts.map((attempt) => attempt.gradeOutOf10)) : 0,
+    bestGrade:
+      testsCompleted > 0 ? Math.max(...attempts.map((attempt) => attempt.gradeOutOf10)) : 0,
+    worstGrade:
+      testsCompleted > 0 ? Math.min(...attempts.map((attempt) => attempt.gradeOutOf10)) : 0,
     accuracy: totalQuestionsAnswered > 0 ? (correctAnswers / totalQuestionsAnswered) * 100 : 0,
     totalQuestionsAnswered,
     totalStudyTime,
     correctAnswers,
     incorrectAnswers,
     mostUsedCategory: categoryPerformance[0]?.category || "",
-    strongestCategory: categoryPerformance.reduce(
-      (best, item) => (!best || item.accuracyPercentage > best.accuracyPercentage ? item : best),
-      categoryPerformance[0],
-    )?.category || "",
-    weakestCategory: categoryPerformance.reduce(
-      (weakest, item) => (!weakest || item.accuracyPercentage < weakest.accuracyPercentage ? item : weakest),
-      categoryPerformance[0],
-    )?.category || "",
+    strongestCategory:
+      categoryPerformance.reduce(
+        (best, item) => (!best || item.accuracyPercentage > best.accuracyPercentage ? item : best),
+        categoryPerformance[0],
+      )?.category || "",
+    weakestCategory:
+      categoryPerformance.reduce(
+        (weakest, item) =>
+          !weakest || item.accuracyPercentage < weakest.accuracyPercentage ? item : weakest,
+        categoryPerformance[0],
+      )?.category || "",
   };
 }
 
@@ -50,10 +55,18 @@ export function calculateGradeDistribution(attempts: CompletedTestAttempt[]) {
 }
 
 export function calculateCategoryPerformance(attempts: CompletedTestAttempt[]) {
-  const map = new Map<string, { correct: number; incorrect: number; unanswered: number; total: number }>();
+  const map = new Map<
+    string,
+    { correct: number; incorrect: number; unanswered: number; total: number }
+  >();
   for (const attempt of attempts) {
     for (const category of attempt.categoryResults) {
-      const current = map.get(category.category) ?? { correct: 0, incorrect: 0, unanswered: 0, total: 0 };
+      const current = map.get(category.category) ?? {
+        correct: 0,
+        incorrect: 0,
+        unanswered: 0,
+        total: 0,
+      };
       current.correct += category.correct;
       current.incorrect += category.incorrect;
       current.unanswered += category.unanswered;
