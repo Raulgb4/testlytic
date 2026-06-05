@@ -22,6 +22,7 @@ export type TestDefinition = {
   includedCategories: string[];
   includedSubcategories?: string[];
   allowUnanswered: boolean;
+  timeLimitEnabled?: boolean;
   negativeMarkingEnabled: boolean;
   penaltyPerIncorrectAnswer: number;
   timeLimitMinutes: number;

@@ -6,7 +6,7 @@ import {
   buildQuestionCollectionSummary,
   validateQuestionCollectionJson,
 } from "./features/test/questionCollectionValidation";
-import { CompletedTestAttempt } from "./features/test/testTypes";
+import { CompletedTestAttempt, TestDefinition } from "./features/test/testTypes";
 import { createTranslator, Language } from "./i18n";
 
 type ThemeMode = "dark" | "light";
@@ -18,6 +18,7 @@ function App() {
   const [completedAttempts, setCompletedAttempts] = useState<CompletedTestAttempt[]>([]);
   const [collection, setCollection] = useState<QuestionCollection | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationIssue[]>([]);
+  const [definitions, setDefinitions] = useState<TestDefinition[]>([]);
 
   const t = useMemo(() => createTranslator(language), [language]);
 
@@ -69,9 +70,15 @@ function App() {
       language={language}
       setLanguage={setLanguage}
       collection={collection}
+      definitions={definitions}
+      setDefinitions={setDefinitions}
       validationErrors={validationErrors}
       onImportCollectionFile={importCollectionFile}
       onClearValidationErrors={() => setValidationErrors([])}
+      onResetQuestionBank={() => {
+        setCollection(null);
+        setValidationErrors([]);
+      }}
       completedAttempts={completedAttempts}
       onAddCompletedAttempt={(attempt) => setCompletedAttempts((current) => [attempt, ...current])}
       onDeleteAllCompletedTests={() => setCompletedAttempts([])}

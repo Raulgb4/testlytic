@@ -12,9 +12,11 @@ export function SettingsSection({
   setLanguage,
   theme,
   setTheme,
+  questionCount,
   answerCount,
   completedCount,
   onDeleteAllAnswers,
+  onResetQuestionBank,
   onDeleteAllCompletedTests,
 }: {
   t: Translator;
@@ -22,12 +24,16 @@ export function SettingsSection({
   setLanguage: (language: Language) => void;
   theme: ThemeMode;
   setTheme: (theme: ThemeMode) => void;
+  questionCount: number;
   answerCount: number;
   completedCount: number;
   onDeleteAllAnswers: () => void;
+  onResetQuestionBank: () => void;
   onDeleteAllCompletedTests: () => void;
 }) {
-  const [confirmAction, setConfirmAction] = useState<null | "answers" | "tests">(null);
+  const [confirmAction, setConfirmAction] = useState<null | "answers" | "questionBank" | "tests">(
+    null,
+  );
   const [dangerMessage, setDangerMessage] = useState("");
   const isDark = theme === "dark";
 
@@ -39,6 +45,10 @@ export function SettingsSection({
     if (confirmAction === "tests") {
       onDeleteAllCompletedTests();
       setDangerMessage(t("settings.dangerTestsDone"));
+    }
+    if (confirmAction === "questionBank") {
+      onResetQuestionBank();
+      setDangerMessage(t("settings.dangerQuestionBankDone"));
     }
     setConfirmAction(null);
   };
@@ -94,6 +104,16 @@ export function SettingsSection({
             type="button"
             className="btn btn-danger"
             onClick={() => {
+              setConfirmAction("questionBank");
+              setDangerMessage("");
+            }}
+          >
+            {t("settings.resetQuestionBank")}
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={() => {
               setConfirmAction("tests");
               setDangerMessage("");
             }}
@@ -106,6 +126,9 @@ export function SettingsSection({
 
         <p className="placeholder-note">
           {t("settings.counts", { answers: answerCount, tests: completedCount })}
+        </p>
+        <p className="placeholder-note">
+          {t("settings.questionBankCount", { count: questionCount })}
         </p>
       </Card>
 
@@ -146,7 +169,9 @@ export function SettingsSection({
             <p>
               {confirmAction === "answers"
                 ? t("settings.confirmDeleteAnswers")
-                : t("settings.confirmDeleteTests")}
+                : confirmAction === "questionBank"
+                  ? t("settings.confirmResetQuestionBank")
+                  : t("settings.confirmDeleteTests")}
             </p>
             <div className="card-actions settings-modal-actions">
               <Button variant="secondary" onClick={() => setConfirmAction(null)}>

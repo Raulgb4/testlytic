@@ -1,4 +1,13 @@
-import { FormEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  RefObject,
+  type Dispatch,
+  type SetStateAction,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Translator } from "../../app/types";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
@@ -20,6 +29,11 @@ import {
   getSubcategoryOptions,
   isExactSetMatch,
 } from "./testUtils";
+import {
+  getEffectiveTimeLimitMinutes,
+  getFinishSummary,
+  isTimeLimitEnabled,
+} from "./testRuntimeUtils";
 
 type TestFormState = {
   title: string;
@@ -27,6 +41,7 @@ type TestFormState = {
   includedCategories: string[];
   includedSubcategories: string[];
   allowUnanswered: boolean;
+  timeLimitEnabled: boolean;
   negativeMarkingEnabled: boolean;
   penaltyPerIncorrectAnswer: number;
   timeLimitMinutes: number;
@@ -38,6 +53,7 @@ const INITIAL_FORM: TestFormState = {
   includedCategories: [],
   includedSubcategories: [],
   allowUnanswered: true,
+  timeLimitEnabled: false,
   negativeMarkingEnabled: false,
   penaltyPerIncorrectAnswer: 0.25,
   timeLimitMinutes: 30,
@@ -46,18 +62,21 @@ const INITIAL_FORM: TestFormState = {
 export function TestSection({
   t,
   collection,
+  definitions,
+  setDefinitions,
   onCompletedAttempt,
   onGoToQuestionBank,
 }: {
   t: Translator;
   collection: QuestionCollection | null;
+  definitions: TestDefinition[];
+  setDefinitions: Dispatch<SetStateAction<TestDefinition[]>>;
   onCompletedAttempt: (attempt: CompletedTestAttempt) => void;
   onGoToQuestionBank: () => void;
 }) {
   const [toast, setToast] = useState<null | { message: string; variant: "success" | "error" }>(
     null,
   );
-  const [definitions, setDefinitions] = useState<TestDefinition[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [formState, setFormState] = useState<TestFormState>(INITIAL_FORM);
   const [editingTestId, setEditingTestId] = useState<string | null>(null);
@@ -72,9 +91,12 @@ export function TestSection({
   const [resultAttempt, setResultAttempt] = useState<{
     result: TestAttempt;
     definition: TestDefinition;
+    reason: "manual" | "timeout";
   } | null>(null);
   const [finishWarning, setFinishWarning] = useState("");
+  const [finishConfirmOpen, setFinishConfirmOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const completionInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -87,6 +109,12 @@ export function TestSection({
     setNowMs(Date.now());
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
+  }, [activeAttempt]);
+
+  useEffect(() => {
+    if (activeAttempt) {
+      completionInFlightRef.current = false;
+    }
   }, [activeAttempt]);
 
   const bankQuestions = useMemo(() => collection?.questions || [], [collection]);
@@ -143,6 +171,7 @@ export function TestSection({
       includedCategories: definition.includedCategories,
       includedSubcategories: definition.includedSubcategories || [],
       allowUnanswered: definition.allowUnanswered,
+      timeLimitEnabled: isTimeLimitEnabled(definition),
       negativeMarkingEnabled: definition.negativeMarkingEnabled,
       penaltyPerIncorrectAnswer: definition.penaltyPerIncorrectAnswer,
       timeLimitMinutes: definition.timeLimitMinutes,
@@ -175,11 +204,12 @@ export function TestSection({
       includedCategories: formState.includedCategories,
       includedSubcategories: formState.includedSubcategories,
       allowUnanswered: formState.allowUnanswered,
+      timeLimitEnabled: formState.timeLimitEnabled,
       negativeMarkingEnabled: formState.negativeMarkingEnabled,
       penaltyPerIncorrectAnswer: formState.negativeMarkingEnabled
         ? formState.penaltyPerIncorrectAnswer
         : 0,
-      timeLimitMinutes: formState.timeLimitMinutes,
+      timeLimitMinutes: formState.timeLimitEnabled ? formState.timeLimitMinutes : 0,
       createdAt: editingTestId
         ? definitions.find((item) => item.id === editingTestId)?.createdAt || now
         : now,
@@ -227,13 +257,15 @@ export function TestSection({
       draftSelections: {},
       currentQueueIndex: 0,
     };
+    completionInFlightRef.current = false;
     setFinishWarning("");
+    setFinishConfirmOpen(false);
     setResultAttempt(null);
     setActiveAttempt(nextAttempt);
   };
 
   const selectDraftAnswer = (queueItem: RuntimeQueueItem, optionId: string) => {
-    if (!activeAttempt) return;
+    if (!activeAttempt || completionInFlightRef.current) return;
     if (activeAttempt.submittedAnswers[queueItem.queueId]) return;
 
     const current = activeAttempt.draftSelections[queueItem.queueId] || [];
@@ -257,7 +289,7 @@ export function TestSection({
   };
 
   const submitCurrentAnswer = () => {
-    if (!activeAttempt) return;
+    if (!activeAttempt || completionInFlightRef.current) return;
     const queueItem = activeAttempt.queue[activeAttempt.currentQueueIndex];
     if (!queueItem || activeAttempt.submittedAnswers[queueItem.queueId]) return;
     const selectedOptionIds = activeAttempt.draftSelections[queueItem.queueId] || [];
@@ -296,6 +328,7 @@ export function TestSection({
   };
 
   const goToPreviousQuestion = () => {
+    if (completionInFlightRef.current) return;
     setActiveAttempt((current) => {
       if (!current) return current;
       return {
@@ -307,6 +340,7 @@ export function TestSection({
   };
 
   const goToNextQuestion = () => {
+    if (completionInFlightRef.current) return;
     setActiveAttempt((current) => {
       if (!current) return current;
       return {
@@ -317,23 +351,42 @@ export function TestSection({
     setFinishWarning("");
   };
 
-  const finishActiveTest = () => {
-    if (!activeAttempt) return;
-    const definition = definitions.find((item) => item.id === activeAttempt.testId);
-    if (!definition) return;
-    const unansweredOriginalCount = activeAttempt.queue.filter(
-      (queueItem) =>
-        queueItem.retryNumber === 0 && !activeAttempt.submittedAnswers[queueItem.queueId],
-    ).length;
-    if (!definition.allowUnanswered && unansweredOriginalCount > 0) {
-      setFinishWarning(t("test.finishWarning", { count: unansweredOriginalCount }));
-      return;
-    }
-    const result = calculateAttemptResult(activeAttempt, definition);
-    setResultAttempt({ result, definition });
+  const activeDefinition = activeAttempt
+    ? definitions.find((item) => item.id === activeAttempt.testId) || null
+    : null;
+  const finishSummary = activeAttempt ? getFinishSummary(activeAttempt) : null;
+
+  const completeActiveTest = (reason: "manual" | "timeout") => {
+    if (!activeAttempt || !activeDefinition || completionInFlightRef.current) return;
+    completionInFlightRef.current = true;
+    const result = calculateAttemptResult(activeAttempt, activeDefinition);
+    setFinishConfirmOpen(false);
+    setFinishWarning("");
+    setResultAttempt({ result, definition: activeDefinition, reason });
     onCompletedAttempt(result);
     setActiveAttempt(null);
   };
+
+  const requestFinishConfirmation = () => {
+    if (!activeAttempt || !activeDefinition || !finishSummary || completionInFlightRef.current)
+      return;
+    if (!activeDefinition.allowUnanswered && finishSummary.unanswered > 0) {
+      setFinishWarning(t("test.finishWarning", { count: finishSummary.unanswered }));
+    } else {
+      setFinishWarning("");
+    }
+    setFinishConfirmOpen(true);
+  };
+
+  useEffect(() => {
+    if (!activeAttempt || !activeDefinition) return;
+    if (getEffectiveTimeLimitMinutes(activeDefinition) <= 0) return;
+    const startedAtMs = new Date(activeAttempt.startedAt).getTime();
+    const elapsedSeconds = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
+    const remainingSeconds = getEffectiveTimeLimitMinutes(activeDefinition) * 60 - elapsedSeconds;
+    if (remainingSeconds > 0) return;
+    completeActiveTest("timeout");
+  }, [activeAttempt, activeDefinition, nowMs]);
 
   if (!collection) {
     return (
@@ -357,7 +410,6 @@ export function TestSection({
     const currentQuestion = currentQueueItem.question;
     const currentAnswer = activeAttempt.submittedAnswers[currentQueueItem.queueId];
     const currentDraft = activeAttempt.draftSelections[currentQueueItem.queueId] || [];
-    const activeDefinition = definitions.find((item) => item.id === activeAttempt.testId);
     const allowUnanswered = activeDefinition?.allowUnanswered || false;
     const hasSubmittedCurrentAnswer = Boolean(currentAnswer);
     const hasNextQuestion = activeAttempt.currentQueueIndex < activeAttempt.queue.length - 1;
@@ -376,7 +428,10 @@ export function TestSection({
       0,
       Math.floor((nowMs - new Date(activeAttempt.startedAt).getTime()) / 1000),
     );
-    const timeUrgency = getTimeUrgency(elapsedSeconds, activeDefinition?.timeLimitMinutes || 0);
+    const effectiveTimeLimitMinutes = activeDefinition
+      ? getEffectiveTimeLimitMinutes(activeDefinition)
+      : 0;
+    const timeUrgency = getTimeUrgency(elapsedSeconds, effectiveTimeLimitMinutes);
     const visibleQuestionPosition = Math.min(
       activeAttempt.currentQueueIndex + 1,
       activeAttempt.originalQuestionCount,
@@ -420,8 +475,8 @@ export function TestSection({
             <MetricLine
               label={t("test.statusLimit")}
               value={
-                activeDefinition && activeDefinition.timeLimitMinutes > 0
-                  ? t("test.limitMinutes", { minutes: activeDefinition.timeLimitMinutes })
+                activeDefinition && effectiveTimeLimitMinutes > 0
+                  ? t("test.limitMinutes", { minutes: effectiveTimeLimitMinutes })
                   : t("test.noTimeLimit")
               }
               className={timeUrgency === "normal" ? undefined : "time-metric"}
@@ -457,6 +512,7 @@ export function TestSection({
                   type="button"
                   className={className}
                   onClick={() => selectDraftAnswer(currentQueueItem, option.id)}
+                  disabled={completionInFlightRef.current}
                 >
                   <span className="option-key">{getVisibleOptionLabel(optionIndex)}</span>
                   <span>{option.text}</span>
@@ -466,29 +522,75 @@ export function TestSection({
           </div>
 
           <div className="test-runner-footer">
-            {activeAttempt.currentQueueIndex > 0 ? (
-              <Button variant="secondary" onClick={goToPreviousQuestion}>
-                {t("test.previous")}
-              </Button>
-            ) : null}
-            {showAnswer ? <Button onClick={submitCurrentAnswer}>{t("test.answer")}</Button> : null}
-            {showNext ? (
-              <Button variant="secondary" onClick={goToNextQuestion}>
-                {t("test.next")}
-              </Button>
-            ) : null}
-            <Button onClick={finishActiveTest}>{t("test.finish")}</Button>
+            <div className="test-runner-footer-main">
+              {activeAttempt.currentQueueIndex > 0 ? (
+                <Button variant="secondary" onClick={goToPreviousQuestion}>
+                  {t("test.previous")}
+                </Button>
+              ) : null}
+              {showAnswer ? (
+                <Button onClick={submitCurrentAnswer}>{t("test.answer")}</Button>
+              ) : null}
+              {showNext ? (
+                <Button variant="secondary" onClick={goToNextQuestion}>
+                  {t("test.next")}
+                </Button>
+              ) : null}
+            </div>
+            <div className="test-runner-finish-action">
+              <button type="button" className="btn btn-danger" onClick={requestFinishConfirmation}>
+                {t("test.finish")}
+              </button>
+            </div>
           </div>
         </Card>
         {finishWarning ? (
           <p className="field-error runner-finish-warning">{finishWarning}</p>
+        ) : null}
+        {finishConfirmOpen && finishSummary ? (
+          <div className="settings-modal-backdrop" role="presentation">
+            <div className="settings-modal finish-confirm-modal" role="dialog" aria-modal="true">
+              <h3>{t("test.finishConfirmTitle")}</h3>
+              <p>{t("test.finishConfirmBody")}</p>
+              <div className="finish-confirm-summary">
+                <MetricLine
+                  label={t("test.statusAnswered")}
+                  value={String(finishSummary.answered)}
+                />
+                <MetricLine
+                  label={t("test.kpiUnanswered")}
+                  value={String(finishSummary.unanswered)}
+                />
+                <MetricLine label={t("test.statusCorrect")} value={String(finishSummary.correct)} />
+                <MetricLine label={t("test.statusWrong")} value={String(finishSummary.incorrect)} />
+              </div>
+              {!allowUnanswered && finishSummary.unanswered > 0 ? (
+                <p className="field-error finish-confirm-blocked">
+                  {t("test.finishConfirmBlocked", { count: finishSummary.unanswered })}
+                </p>
+              ) : null}
+              <div className="settings-modal-actions">
+                <Button variant="secondary" onClick={() => setFinishConfirmOpen(false)}>
+                  {t("test.cancel")}
+                </Button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={() => completeActiveTest("manual")}
+                  disabled={!allowUnanswered && finishSummary.unanswered > 0}
+                >
+                  {t("test.finishConfirmAction")}
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
       </div>
     );
   }
 
   if (resultAttempt) {
-    const { result, definition } = resultAttempt;
+    const { result, definition, reason } = resultAttempt;
     return (
       <div className="view-grid results-view">
         <Card
@@ -496,6 +598,9 @@ export function TestSection({
           subtitle={definition.title}
           className="results-hero-card"
         >
+          {reason === "timeout" ? (
+            <p className="results-timeout-notice">{t("test.timeUp")}</p>
+          ) : null}
           <p className="results-grade">{result.gradeOutOf10.toFixed(1)} / 10</p>
           <div className="results-meta-line">
             <span>
@@ -576,9 +681,9 @@ export function TestSection({
                           questions: definition.questionLimit,
                           categories: definition.includedCategories.length,
                           time:
-                            definition.timeLimitMinutes > 0
+                            getEffectiveTimeLimitMinutes(definition) > 0
                               ? t("test.savedTestTimeLimit", {
-                                  minutes: definition.timeLimitMinutes,
+                                  minutes: getEffectiveTimeLimitMinutes(definition),
                                 })
                               : t("test.savedTestNoTimeLimit"),
                           negative: definition.negativeMarkingEnabled
@@ -707,29 +812,6 @@ export function TestSection({
 
                 <section className="test-form-section">
                   <h4>{t("test.sectionTimingScoring")}</h4>
-                  <label className="field">
-                    <span>{t("test.timeLimit")}</span>
-                    <input
-                      ref={timeLimitInputRef}
-                      className="input"
-                      type="number"
-                      min={0}
-                      value={formState.timeLimitMinutes}
-                      onChange={(event) =>
-                        setFormState({
-                          ...formState,
-                          timeLimitMinutes: Number(event.target.value || 0),
-                        })
-                      }
-                      aria-invalid={showErrors && Boolean(formValidation.errors.timeLimitMinutes)}
-                    />
-                    {showErrors && formValidation.errors.timeLimitMinutes ? (
-                      <small className="field-error">
-                        {formValidation.errors.timeLimitMinutes}
-                      </small>
-                    ) : null}
-                  </label>
-
                   <label className="field-inline">
                     <input
                       type="checkbox"
@@ -740,6 +822,46 @@ export function TestSection({
                     />
                     <span>{t("test.allowUnanswered")}</span>
                   </label>
+
+                  <label className="field-inline">
+                    <input
+                      type="checkbox"
+                      checked={formState.timeLimitEnabled}
+                      onChange={(event) =>
+                        setFormState({ ...formState, timeLimitEnabled: event.target.checked })
+                      }
+                    />
+                    <span>{t("test.enableTimeLimit")}</span>
+                  </label>
+
+                  <div
+                    className={
+                      formState.timeLimitEnabled ? "penalty-reveal show" : "penalty-reveal"
+                    }
+                  >
+                    <label className="field">
+                      <span>{t("test.timeLimit")}</span>
+                      <input
+                        ref={timeLimitInputRef}
+                        className="input"
+                        type="number"
+                        min={1}
+                        value={formState.timeLimitMinutes}
+                        onChange={(event) =>
+                          setFormState({
+                            ...formState,
+                            timeLimitMinutes: Number(event.target.value || 0),
+                          })
+                        }
+                        aria-invalid={showErrors && Boolean(formValidation.errors.timeLimitMinutes)}
+                      />
+                      {showErrors && formValidation.errors.timeLimitMinutes ? (
+                        <small className="field-error">
+                          {formValidation.errors.timeLimitMinutes}
+                        </small>
+                      ) : null}
+                    </label>
+                  </div>
 
                   <label className="field-inline">
                     <input
@@ -953,8 +1075,8 @@ function validateDefinitionForm(form: TestFormState, bankQuestions: CollectionQu
   if (form.includedCategories.length === 0) {
     errors.includedCategories = "Select at least one category.";
   }
-  if (form.timeLimitMinutes < 0) {
-    errors.timeLimitMinutes = "Time limit cannot be negative.";
+  if (form.timeLimitEnabled && form.timeLimitMinutes < 1) {
+    errors.timeLimitMinutes = "Time limit must be at least 1 minute.";
   }
   if (form.negativeMarkingEnabled && form.penaltyPerIncorrectAnswer < 0) {
     errors.penaltyPerIncorrectAnswer = "Penalty cannot be negative.";
@@ -967,9 +1089,10 @@ function validateDefinitionForm(form: TestFormState, bankQuestions: CollectionQu
     includedCategories: form.includedCategories,
     includedSubcategories: form.includedSubcategories,
     allowUnanswered: form.allowUnanswered,
+    timeLimitEnabled: form.timeLimitEnabled,
     negativeMarkingEnabled: form.negativeMarkingEnabled,
     penaltyPerIncorrectAnswer: form.penaltyPerIncorrectAnswer,
-    timeLimitMinutes: form.timeLimitMinutes,
+    timeLimitMinutes: form.timeLimitEnabled ? form.timeLimitMinutes : 0,
     createdAt: "",
     updatedAt: "",
   };
