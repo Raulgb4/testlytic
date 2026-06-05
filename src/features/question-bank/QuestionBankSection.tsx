@@ -4,6 +4,11 @@ import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
 import { Toast } from "../../shared/components/Toast";
 import { QuestionCollectionOnboarding } from "../test/QuestionCollectionOnboarding";
+import {
+  ImportCollectionResult,
+  ImportConflictResolution,
+  PendingImportConflict,
+} from "../test/questionCollectionImport";
 import { saveQuestionBankExport } from "../test/questionCollectionExport";
 import { saveQuestionCollectionTemplate } from "../test/questionCollectionTemplate";
 import "./question-bank.css";
@@ -20,14 +25,20 @@ export function QuestionBankSection({
   t,
   collection,
   validationErrors,
+  pendingImportConflict,
   onImportFile,
   onClearValidationErrors,
+  onResolveImportConflict,
+  onCancelImportConflict,
 }: {
   t: Translator;
   collection: QuestionCollection | null;
   validationErrors: ValidationIssue[];
-  onImportFile: (file: File, merge?: boolean) => Promise<boolean>;
+  pendingImportConflict: PendingImportConflict | null;
+  onImportFile: (file: File, merge?: boolean) => Promise<ImportCollectionResult>;
   onClearValidationErrors: () => void;
+  onResolveImportConflict: (resolution: ImportConflictResolution) => { status: "imported" } | { status: "cancelled" };
+  onCancelImportConflict: () => { status: "cancelled" };
 }) {
   const importMoreInputId = useId();
   const importMoreInputRef = useRef<HTMLInputElement | null>(null);
@@ -70,8 +81,26 @@ export function QuestionBankSection({
   };
 
   const handleImportMore = async (file: File) => {
-    const imported = await onImportFile(file, true);
-    if (imported) setImportMoreOpen(false);
+    const result = await onImportFile(file, true);
+    if (result.status === "imported" || result.status === "conflict") {
+      setImportMoreOpen(false);
+    }
+  };
+
+  const resolveConflict = (resolution: ImportConflictResolution) => {
+    const result = onResolveImportConflict(resolution);
+    if (result.status !== "imported") return;
+    setToast({
+      message:
+        resolution === "newIds"
+          ? t("questionBank.importResolvedNewIdsSuccess")
+          : t("questionBank.importResolvedReplaceSuccess"),
+      variant: "success",
+    });
+  };
+
+  const cancelConflict = () => {
+    onCancelImportConflict();
   };
 
   const closeImportMore = () => {
@@ -88,6 +117,14 @@ export function QuestionBankSection({
           onDownloadTemplate={handleDownloadTemplate}
           onImportFile={(file) => void handleInitialImport(file)}
         />
+        {pendingImportConflict ? (
+          <ImportConflictModal
+            t={t}
+            duplicateIds={pendingImportConflict.duplicateIds}
+            onResolve={resolveConflict}
+            onCancel={cancelConflict}
+          />
+        ) : null}
         {toast ? (
           <Toast
             message={toast.message}
@@ -173,6 +210,15 @@ export function QuestionBankSection({
         </div>
       ) : null}
 
+      {pendingImportConflict ? (
+        <ImportConflictModal
+          t={t}
+          duplicateIds={pendingImportConflict.duplicateIds}
+          onResolve={resolveConflict}
+          onCancel={cancelConflict}
+        />
+      ) : null}
+
       {toast ? (
         <Toast
           message={toast.message}
@@ -181,6 +227,74 @@ export function QuestionBankSection({
           closeLabel={t("test.toastClose")}
         />
       ) : null}
+    </div>
+  );
+}
+
+function ImportConflictModal({
+  t,
+  duplicateIds,
+  onResolve,
+  onCancel,
+}: {
+  t: Translator;
+  duplicateIds: string[];
+  onResolve: (resolution: ImportConflictResolution) => void;
+  onCancel: () => void;
+}) {
+  const visibleIds = duplicateIds.slice(0, 5);
+  const remainingCount = Math.max(0, duplicateIds.length - visibleIds.length);
+
+  return (
+    <div className="settings-modal-backdrop" role="presentation">
+      <div className="settings-modal import-conflict-modal" role="dialog" aria-modal="true">
+        <h3>{t("questionBank.importConflictTitle")}</h3>
+        <p>{t("questionBank.importConflictBody")}</p>
+
+        <div className="import-conflict-summary">
+          <MetricLine
+            label={t("questionBank.importConflictDuplicateCount")}
+            value={String(duplicateIds.length)}
+          />
+        </div>
+
+        <div className="import-conflict-id-list">
+          <span>{t("questionBank.importConflictExamples")}</span>
+          <ul>
+            {visibleIds.map((id) => (
+              <li key={id}>{id}</li>
+            ))}
+          </ul>
+          {remainingCount > 0 ? (
+            <p>{t("questionBank.importConflictMore", { count: remainingCount })}</p>
+          ) : null}
+        </div>
+
+        <div className="import-conflict-help">
+          <p>
+            <strong>{t("questionBank.importConflictNewIds")}</strong>: {t("questionBank.importConflictNewIdsHelp")}
+          </p>
+          <p>
+            <strong>{t("questionBank.importConflictReplace")}</strong>: {t("questionBank.importConflictReplaceHelp")}
+          </p>
+        </div>
+
+        <div className="import-conflict-actions">
+          <button type="button" className="btn btn-primary" onClick={() => onResolve("newIds")}>
+            {t("questionBank.importConflictNewIds")}
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={() => onResolve("replaceExisting")}
+          >
+            {t("questionBank.importConflictReplace")}
+          </button>
+          <Button variant="secondary" onClick={onCancel}>
+            {t("questionBank.importConflictCancel")}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

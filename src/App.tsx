@@ -1,11 +1,17 @@
 import { useMemo, useState } from "react";
 import { AppShell } from "./app/AppShell";
 import { SectionId } from "./app/navigation";
-import { QuestionCollection, ValidationIssue } from "./features/test/questionCollectionTypes";
 import {
-  buildQuestionCollectionSummary,
-  validateQuestionCollectionJson,
-} from "./features/test/questionCollectionValidation";
+  buildUpdatedQuestionCollection,
+  findDuplicateQuestionIds,
+  ImportCollectionResult,
+  ImportConflictResolution,
+  importQuestionsWithNewIds,
+  PendingImportConflict,
+  replaceExistingQuestions,
+} from "./features/test/questionCollectionImport";
+import { QuestionCollection, ValidationIssue } from "./features/test/questionCollectionTypes";
+import { validateQuestionCollectionJson } from "./features/test/questionCollectionValidation";
 import { CompletedTestAttempt, TestDefinition } from "./features/test/testTypes";
 import { createTranslator, Language } from "./i18n";
 
@@ -19,45 +25,63 @@ function App() {
   const [collection, setCollection] = useState<QuestionCollection | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationIssue[]>([]);
   const [definitions, setDefinitions] = useState<TestDefinition[]>([]);
+  const [pendingImportConflict, setPendingImportConflict] = useState<PendingImportConflict | null>(
+    null,
+  );
 
   const t = useMemo(() => createTranslator(language), [language]);
 
-  const importCollectionFile = async (file: File, merge = false) => {
+  const importCollectionFile = async (file: File, merge = false): Promise<ImportCollectionResult> => {
     const raw = await file.text();
     const validation = validateQuestionCollectionJson(raw);
     if (!validation.ok) {
+      setPendingImportConflict(null);
       setValidationErrors(validation.errors);
-      return false;
+      return { status: "invalid" };
     }
 
     if (merge && collection) {
-      const existingIds = new Set(collection.questions.map((question) => question.id));
-      const duplicateErrors = validation.collection.questions
-        .filter((question) => existingIds.has(question.id))
-        .map((question) => ({
-          path: `questions.${question.id}`,
-          message: "Question ID already exists in the current question bank.",
-        }));
+      const duplicateIds = findDuplicateQuestionIds(collection.questions, validation.collection.questions);
 
-      if (duplicateErrors.length > 0) {
-        setValidationErrors(duplicateErrors);
-        return false;
+      if (duplicateIds.length > 0) {
+        setValidationErrors([]);
+        setPendingImportConflict({
+          incomingCollection: validation.collection,
+          duplicateIds,
+        });
+        return { status: "conflict", duplicateIds };
       }
 
       const mergedQuestions = [...collection.questions, ...validation.collection.questions];
-      setCollection({
-        version: collection.version,
-        importedAt: new Date().toISOString(),
-        questions: mergedQuestions,
-        summary: buildQuestionCollectionSummary(mergedQuestions),
-      });
+      setCollection(buildUpdatedQuestionCollection(collection, mergedQuestions));
+      setPendingImportConflict(null);
       setValidationErrors([]);
-      return true;
+      return { status: "imported" };
     }
 
     setCollection(validation.collection);
+    setPendingImportConflict(null);
     setValidationErrors([]);
-    return true;
+    return { status: "imported" };
+  };
+
+  const resolveImportConflict = (resolution: ImportConflictResolution) => {
+    if (!collection || !pendingImportConflict) return { status: "cancelled" } as const;
+
+    const nextQuestions =
+      resolution === "replaceExisting"
+        ? replaceExistingQuestions(collection.questions, pendingImportConflict.incomingCollection.questions)
+        : importQuestionsWithNewIds(collection.questions, pendingImportConflict.incomingCollection.questions);
+
+    setCollection(buildUpdatedQuestionCollection(collection, nextQuestions));
+    setValidationErrors([]);
+    setPendingImportConflict(null);
+    return { status: "imported" } as const;
+  };
+
+  const cancelImportConflict = () => {
+    setPendingImportConflict(null);
+    return { status: "cancelled" } as const;
   };
 
   return (
@@ -73,11 +97,15 @@ function App() {
       definitions={definitions}
       setDefinitions={setDefinitions}
       validationErrors={validationErrors}
+      pendingImportConflict={pendingImportConflict}
       onImportCollectionFile={importCollectionFile}
       onClearValidationErrors={() => setValidationErrors([])}
+      onResolveImportConflict={resolveImportConflict}
+      onCancelImportConflict={cancelImportConflict}
       onResetQuestionBank={() => {
         setCollection(null);
         setValidationErrors([]);
+        setPendingImportConflict(null);
       }}
       completedAttempts={completedAttempts}
       onAddCompletedAttempt={(attempt) => setCompletedAttempts((current) => [attempt, ...current])}

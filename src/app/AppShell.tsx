@@ -3,6 +3,11 @@ import appLogo from "../assets/logo/NEW LOGO.png";
 import { AnalyticsSection } from "../features/analytics/AnalyticsSection";
 import { QuestionBankSection } from "../features/question-bank/QuestionBankSection";
 import { SettingsSection } from "../features/settings/SettingsSection";
+import {
+  ImportCollectionResult,
+  ImportConflictResolution,
+  PendingImportConflict,
+} from "../features/test/questionCollectionImport";
 import { QuestionCollection, ValidationIssue } from "../features/test/questionCollectionTypes";
 import { TestSection } from "../features/test/TestSection";
 import { CompletedTestAttempt, TestDefinition } from "../features/test/testTypes";
@@ -25,8 +30,11 @@ export function AppShell({
   definitions,
   setDefinitions,
   validationErrors,
+  pendingImportConflict,
   onImportCollectionFile,
   onClearValidationErrors,
+  onResolveImportConflict,
+  onCancelImportConflict,
   onResetQuestionBank,
   completedAttempts,
   onAddCompletedAttempt,
@@ -43,8 +51,11 @@ export function AppShell({
   definitions: TestDefinition[];
   setDefinitions: Dispatch<SetStateAction<TestDefinition[]>>;
   validationErrors: ValidationIssue[];
-  onImportCollectionFile: (file: File, merge?: boolean) => Promise<boolean>;
+  pendingImportConflict: PendingImportConflict | null;
+  onImportCollectionFile: (file: File, merge?: boolean) => Promise<ImportCollectionResult>;
   onClearValidationErrors: () => void;
+  onResolveImportConflict: (resolution: ImportConflictResolution) => { status: "imported" } | { status: "cancelled" };
+  onCancelImportConflict: () => { status: "cancelled" };
   onResetQuestionBank: () => void;
   completedAttempts: CompletedTestAttempt[];
   onAddCompletedAttempt: (attempt: CompletedTestAttempt) => void;
@@ -83,8 +94,11 @@ export function AppShell({
               t={t}
               collection={collection}
               validationErrors={validationErrors}
+              pendingImportConflict={pendingImportConflict}
               onImportFile={onImportCollectionFile}
               onClearValidationErrors={onClearValidationErrors}
+              onResolveImportConflict={onResolveImportConflict}
+              onCancelImportConflict={onCancelImportConflict}
             />
           ) : null}
           {section === "test" ? (
