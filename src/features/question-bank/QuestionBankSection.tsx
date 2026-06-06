@@ -37,7 +37,9 @@ export function QuestionBankSection({
   pendingImportConflict: PendingImportConflict | null;
   onImportFile: (file: File, merge?: boolean) => Promise<ImportCollectionResult>;
   onClearValidationErrors: () => void;
-  onResolveImportConflict: (resolution: ImportConflictResolution) => { status: "imported" } | { status: "cancelled" };
+  onResolveImportConflict: (
+    resolution: ImportConflictResolution,
+  ) => { status: "imported" } | { status: "cancelled" };
   onCancelImportConflict: () => { status: "cancelled" };
 }) {
   const importMoreInputId = useId();
@@ -272,10 +274,12 @@ function ImportConflictModal({
 
         <div className="import-conflict-help">
           <p>
-            <strong>{t("questionBank.importConflictNewIds")}</strong>: {t("questionBank.importConflictNewIdsHelp")}
+            <strong>{t("questionBank.importConflictNewIds")}</strong>:{" "}
+            {t("questionBank.importConflictNewIdsHelp")}
           </p>
           <p>
-            <strong>{t("questionBank.importConflictReplace")}</strong>: {t("questionBank.importConflictReplaceHelp")}
+            <strong>{t("questionBank.importConflictReplace")}</strong>:{" "}
+            {t("questionBank.importConflictReplaceHelp")}
           </p>
         </div>
 

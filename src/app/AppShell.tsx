@@ -54,7 +54,9 @@ export function AppShell({
   pendingImportConflict: PendingImportConflict | null;
   onImportCollectionFile: (file: File, merge?: boolean) => Promise<ImportCollectionResult>;
   onClearValidationErrors: () => void;
-  onResolveImportConflict: (resolution: ImportConflictResolution) => { status: "imported" } | { status: "cancelled" };
+  onResolveImportConflict: (
+    resolution: ImportConflictResolution,
+  ) => { status: "imported" } | { status: "cancelled" };
   onCancelImportConflict: () => { status: "cancelled" };
   onResetQuestionBank: () => void;
   completedAttempts: CompletedTestAttempt[];

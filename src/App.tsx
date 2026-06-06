@@ -31,7 +31,10 @@ function App() {
 
   const t = useMemo(() => createTranslator(language), [language]);
 
-  const importCollectionFile = async (file: File, merge = false): Promise<ImportCollectionResult> => {
+  const importCollectionFile = async (
+    file: File,
+    merge = false,
+  ): Promise<ImportCollectionResult> => {
     const raw = await file.text();
     const validation = validateQuestionCollectionJson(raw);
     if (!validation.ok) {
@@ -41,7 +44,10 @@ function App() {
     }
 
     if (merge && collection) {
-      const duplicateIds = findDuplicateQuestionIds(collection.questions, validation.collection.questions);
+      const duplicateIds = findDuplicateQuestionIds(
+        collection.questions,
+        validation.collection.questions,
+      );
 
       if (duplicateIds.length > 0) {
         setValidationErrors([]);
@@ -70,8 +76,14 @@ function App() {
 
     const nextQuestions =
       resolution === "replaceExisting"
-        ? replaceExistingQuestions(collection.questions, pendingImportConflict.incomingCollection.questions)
-        : importQuestionsWithNewIds(collection.questions, pendingImportConflict.incomingCollection.questions);
+        ? replaceExistingQuestions(
+            collection.questions,
+            pendingImportConflict.incomingCollection.questions,
+          )
+        : importQuestionsWithNewIds(
+            collection.questions,
+            pendingImportConflict.incomingCollection.questions,
+          );
 
     setCollection(buildUpdatedQuestionCollection(collection, nextQuestions));
     setValidationErrors([]);
