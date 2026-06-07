@@ -1,13 +1,4 @@
-import {
-  FormEvent,
-  RefObject,
-  type Dispatch,
-  type SetStateAction,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { FormEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { Translator } from "../../app/types";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
@@ -72,7 +63,9 @@ export function TestSection({
   t,
   collection,
   definitions,
-  setDefinitions,
+  onSaveDefinition,
+  onDeleteDefinition,
+  onGenerateQuestions,
   onCompletedAttempt,
   onUpdateQuestionDifficulty,
   onGoToQuestionBank,
@@ -80,8 +73,14 @@ export function TestSection({
   t: Translator;
   collection: QuestionCollection | null;
   definitions: TestDefinition[];
-  setDefinitions: Dispatch<SetStateAction<TestDefinition[]>>;
-  onCompletedAttempt: (attempt: CompletedTestAttempt) => void;
+  onSaveDefinition: (definition: TestDefinition) => void;
+  onDeleteDefinition: (definition: TestDefinition) => void;
+  onGenerateQuestions: (definition: TestDefinition) => Promise<QuestionCollection["questions"]>;
+  onCompletedAttempt: (
+    attempt: CompletedTestAttempt,
+    queue: RuntimeQueueItem[],
+    submittedAnswers: Record<string, RuntimeAnswer | undefined>,
+  ) => void;
   onUpdateQuestionDifficulty: (questionId: string, difficulty: DifficultyLevel) => void;
   onGoToQuestionBank: () => void;
 }) {
@@ -239,12 +238,7 @@ export function TestSection({
       updatedAt: now,
     };
 
-    setDefinitions((current) => {
-      if (editingTestId) {
-        return current.map((item) => (item.id === editingTestId ? payload : item));
-      }
-      return [payload, ...current];
-    });
+    onSaveDefinition(payload);
     setFormOpen(false);
   };
 
@@ -259,8 +253,9 @@ export function TestSection({
     }));
   };
 
-  const runDefinition = (definition: TestDefinition) => {
-    const runtimeQuestions = buildRuntimeQuestions(definition, bankQuestions);
+  const runDefinition = async (definition: TestDefinition) => {
+    const generatedQuestions = await onGenerateQuestions(definition);
+    const runtimeQuestions = buildRuntimeQuestions(definition, generatedQuestions);
     if (runtimeQuestions.length === 0) {
       setToast({ message: t("test.noMatchingQuestions"), variant: "error" });
       return;
@@ -390,7 +385,7 @@ export function TestSection({
     setDifficultyModalOpen(false);
     setDifficultyTarget(null);
     setResultAttempt({ result, definition: activeDefinition, reason });
-    onCompletedAttempt(result);
+    onCompletedAttempt(result, activeAttempt.queue, activeAttempt.submittedAnswers);
     setActiveAttempt(null);
   };
 
@@ -832,7 +827,9 @@ export function TestSection({
                       </p>
                     </div>
                     <div className="saved-test-actions">
-                      <Button onClick={() => runDefinition(definition)}>{t("test.run")}</Button>
+                      <Button onClick={() => void runDefinition(definition)}>
+                        {t("test.run")}
+                      </Button>
                       <Button variant="secondary" onClick={() => openEdit(definition)}>
                         {t("test.edit")}
                       </Button>
@@ -1077,9 +1074,7 @@ export function TestSection({
             <div className="settings-modal-actions">
               <Button
                 onClick={() => {
-                  setDefinitions((current) =>
-                    current.filter((item) => item.id !== deleteTarget.id),
-                  );
+                  onDeleteDefinition(deleteTarget);
                   setDeleteTarget(null);
                 }}
               >

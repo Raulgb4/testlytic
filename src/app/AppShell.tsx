@@ -1,4 +1,3 @@
-import type { Dispatch, SetStateAction } from "react";
 import appLogo from "../assets/logo/NEW LOGO.png";
 import { AnalyticsSection } from "../features/analytics/AnalyticsSection";
 import { QuestionBankSection } from "../features/question-bank/QuestionBankSection";
@@ -14,7 +13,12 @@ import {
   ValidationIssue,
 } from "../features/test/questionCollectionTypes";
 import { TestSection } from "../features/test/TestSection";
-import { CompletedTestAttempt, TestDefinition } from "../features/test/testTypes";
+import {
+  CompletedTestAttempt,
+  RuntimeAnswer,
+  RuntimeQueueItem,
+  TestDefinition,
+} from "../features/test/testTypes";
 import { Language } from "../i18n";
 import { NavItem } from "../shared/components/NavItem";
 import { NAV_ITEMS, SectionId } from "./navigation";
@@ -32,7 +36,9 @@ export function AppShell({
   setLanguage,
   collection,
   definitions,
-  setDefinitions,
+  onSaveDefinition,
+  onDeleteDefinition,
+  onGenerateQuestions,
   validationErrors,
   pendingImportConflict,
   onImportCollectionFile,
@@ -54,18 +60,24 @@ export function AppShell({
   setLanguage: (language: Language) => void;
   collection: QuestionCollection | null;
   definitions: TestDefinition[];
-  setDefinitions: Dispatch<SetStateAction<TestDefinition[]>>;
+  onSaveDefinition: (definition: TestDefinition) => void;
+  onDeleteDefinition: (definition: TestDefinition) => void;
+  onGenerateQuestions: (definition: TestDefinition) => Promise<QuestionCollection["questions"]>;
   validationErrors: ValidationIssue[];
   pendingImportConflict: PendingImportConflict | null;
   onImportCollectionFile: (file: File, merge?: boolean) => Promise<ImportCollectionResult>;
   onClearValidationErrors: () => void;
   onResolveImportConflict: (
     resolution: ImportConflictResolution,
-  ) => { status: "imported" } | { status: "cancelled" };
+  ) => Promise<{ status: "imported" } | { status: "cancelled" }>;
   onCancelImportConflict: () => { status: "cancelled" };
   onResetQuestionBank: () => void;
   completedAttempts: CompletedTestAttempt[];
-  onAddCompletedAttempt: (attempt: CompletedTestAttempt) => void;
+  onAddCompletedAttempt: (
+    attempt: CompletedTestAttempt,
+    queue: RuntimeQueueItem[],
+    submittedAnswers: Record<string, RuntimeAnswer | undefined>,
+  ) => void;
   onDeleteAllCompletedTests: () => void;
   onUpdateQuestionDifficulty: (
     questionId: string,
@@ -117,7 +129,9 @@ export function AppShell({
               t={t}
               collection={collection}
               definitions={definitions}
-              setDefinitions={setDefinitions}
+              onSaveDefinition={onSaveDefinition}
+              onDeleteDefinition={onDeleteDefinition}
+              onGenerateQuestions={onGenerateQuestions}
               onCompletedAttempt={onAddCompletedAttempt}
               onUpdateQuestionDifficulty={onUpdateQuestionDifficulty}
               onGoToQuestionBank={() => setSection("questionBank")}

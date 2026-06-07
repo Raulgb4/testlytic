@@ -10,8 +10,10 @@ import {
   ImportConflictResolution,
   PendingImportConflict,
 } from "../test/questionCollectionImport";
-import { saveQuestionBankExport } from "../test/questionCollectionExport";
+import { QUESTION_BANK_EXPORT_FILE_NAME } from "../test/questionCollectionExport";
 import { saveQuestionCollectionTemplate } from "../test/questionCollectionTemplate";
+import { saveJsonFile } from "../test/questionCollectionTemplate";
+import { exportQuestionBank } from "../../services/persistence";
 import "./question-bank.css";
 import {
   CollectionQuestion,
@@ -40,7 +42,7 @@ export function QuestionBankSection({
   onClearValidationErrors: () => void;
   onResolveImportConflict: (
     resolution: ImportConflictResolution,
-  ) => { status: "imported" } | { status: "cancelled" };
+  ) => Promise<{ status: "imported" } | { status: "cancelled" }>;
   onCancelImportConflict: () => { status: "cancelled" };
 }) {
   const importMoreInputId = useId();
@@ -73,7 +75,11 @@ export function QuestionBankSection({
 
   const handleExportQuestionBank = async () => {
     if (!collection) return;
-    const result = await saveQuestionBankExport(collection);
+    const payload = await exportQuestionBank();
+    const result = await saveJsonFile(
+      QUESTION_BANK_EXPORT_FILE_NAME,
+      JSON.stringify(payload, null, 2),
+    );
     if (result.status === "saved") {
       setToast({ message: t("questionBank.exportSavedSuccess"), variant: "success" });
       return;
@@ -90,8 +96,8 @@ export function QuestionBankSection({
     }
   };
 
-  const resolveConflict = (resolution: ImportConflictResolution) => {
-    const result = onResolveImportConflict(resolution);
+  const resolveConflict = async (resolution: ImportConflictResolution) => {
+    const result = await onResolveImportConflict(resolution);
     if (result.status !== "imported") return;
     setToast({
       message:
@@ -242,7 +248,7 @@ function ImportConflictModal({
 }: {
   t: Translator;
   duplicateQuestions: DuplicateQuestionPreview[];
-  onResolve: (resolution: ImportConflictResolution) => void;
+  onResolve: (resolution: ImportConflictResolution) => void | Promise<void>;
   onCancel: () => void;
 }) {
   const visibleQuestions = duplicateQuestions.slice(0, 5);

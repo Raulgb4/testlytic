@@ -1,14 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "./app/AppShell";
 import { SectionId } from "./app/navigation";
 import {
   buildUpdatedQuestionCollection,
-  findDuplicateQuestions,
   ImportCollectionResult,
   ImportConflictResolution,
-  importQuestionsAsCopies,
   PendingImportConflict,
-  replaceExistingQuestions,
 } from "./features/test/questionCollectionImport";
 import {
   QuestionAnalytics,
@@ -16,8 +13,28 @@ import {
   ValidationIssue,
 } from "./features/test/questionCollectionTypes";
 import { validateQuestionCollectionJson } from "./features/test/questionCollectionValidation";
-import { CompletedTestAttempt, TestDefinition } from "./features/test/testTypes";
+import {
+  CompletedTestAttempt,
+  RuntimeAnswer,
+  RuntimeQueueItem,
+  TestDefinition,
+} from "./features/test/testTypes";
 import { createTranslator, Language } from "./i18n";
+import {
+  deleteAllCompletedAttempts,
+  deleteTestDefinition,
+  generateTestQuestions,
+  getPreferences,
+  getQuestionCollection,
+  importQuestionCollection,
+  listCompletedAttempts,
+  listTestDefinitions,
+  resetQuestionBank,
+  saveCompletedAttempt,
+  saveTestDefinition,
+  setPreference,
+  updateQuestionDifficulty as persistQuestionDifficulty,
+} from "./services/persistence";
 
 type ThemeMode = "dark" | "light";
 
@@ -35,6 +52,46 @@ function App() {
 
   const t = useMemo(() => createTranslator(language), [language]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrate() {
+      try {
+        const [preferences, persistedCollection, persistedDefinitions, persistedAttempts] =
+          await Promise.all([
+            getPreferences(),
+            getQuestionCollection(),
+            listTestDefinitions(),
+            listCompletedAttempts(),
+          ]);
+
+        if (cancelled) return;
+        setLanguage(preferences.language);
+        setTheme(preferences.theme);
+        setCollection(persistedCollection);
+        setDefinitions(persistedDefinitions);
+        setCompletedAttempts(persistedAttempts);
+      } catch (error) {
+        console.error("Failed to hydrate persisted state", error);
+      }
+    }
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const setPersistedLanguage = (nextLanguage: Language) => {
+    setLanguage(nextLanguage);
+    void setPreference("language", nextLanguage);
+  };
+
+  const setPersistedTheme = (nextTheme: ThemeMode) => {
+    setTheme(nextTheme);
+    void setPreference("theme", nextTheme);
+  };
+
   const importCollectionFile = async (
     file: File,
     merge = false,
@@ -47,49 +104,33 @@ function App() {
       return { status: "invalid" };
     }
 
-    if (merge && collection) {
-      const duplicateQuestions = findDuplicateQuestions(
-        collection.questions,
-        validation.collection.questions,
-      );
-
-      if (duplicateQuestions.length > 0) {
-        setValidationErrors([]);
-        setPendingImportConflict({
-          incomingCollection: validation.collection,
-          duplicateQuestions,
-        });
-        return { status: "conflict", duplicateQuestions };
-      }
-
-      const mergedQuestions = [...collection.questions, ...validation.collection.questions];
-      setCollection(buildUpdatedQuestionCollection(collection, mergedQuestions));
-      setPendingImportConflict(null);
+    const result = await importQuestionCollection(validation.collection, merge);
+    if (result.status === "conflict") {
       setValidationErrors([]);
-      return { status: "imported" };
+      setPendingImportConflict({
+        incomingCollection: validation.collection,
+        duplicateQuestions: result.duplicateQuestions,
+      });
+      return { status: "conflict", duplicateQuestions: result.duplicateQuestions };
     }
 
-    setCollection(validation.collection);
+    setCollection(result.collection);
     setPendingImportConflict(null);
     setValidationErrors([]);
     return { status: "imported" };
   };
 
-  const resolveImportConflict = (resolution: ImportConflictResolution) => {
-    if (!collection || !pendingImportConflict) return { status: "cancelled" } as const;
+  const resolveImportConflict = async (resolution: ImportConflictResolution) => {
+    if (!pendingImportConflict) return { status: "cancelled" } as const;
 
-    const nextQuestions =
-      resolution === "replaceExisting"
-        ? replaceExistingQuestions(
-            collection.questions,
-            pendingImportConflict.incomingCollection.questions,
-          )
-        : importQuestionsAsCopies(
-            collection.questions,
-            pendingImportConflict.incomingCollection.questions,
-          );
+    const result = await importQuestionCollection(
+      pendingImportConflict.incomingCollection,
+      true,
+      resolution,
+    );
+    if (result.status !== "imported") return { status: "cancelled" } as const;
 
-    setCollection(buildUpdatedQuestionCollection(collection, nextQuestions));
+    setCollection(result.collection);
     setValidationErrors([]);
     setPendingImportConflict(null);
     return { status: "imported" } as const;
@@ -124,6 +165,31 @@ function App() {
 
       return changed ? buildUpdatedQuestionCollection(current, nextQuestions) : current;
     });
+    void persistQuestionDifficulty(questionId, difficulty);
+  };
+
+  const saveDefinition = async (definition: TestDefinition) => {
+    await saveTestDefinition(definition);
+    setDefinitions((current) => {
+      if (current.some((item) => item.id === definition.id)) {
+        return current.map((item) => (item.id === definition.id ? definition : item));
+      }
+      return [definition, ...current];
+    });
+  };
+
+  const removeDefinition = async (definition: TestDefinition) => {
+    await deleteTestDefinition(definition.id);
+    setDefinitions((current) => current.filter((item) => item.id !== definition.id));
+  };
+
+  const addCompletedAttempt = async (
+    attempt: CompletedTestAttempt,
+    queue: RuntimeQueueItem[],
+    submittedAnswers: Record<string, RuntimeAnswer | undefined>,
+  ) => {
+    await saveCompletedAttempt(attempt, queue, submittedAnswers);
+    setCompletedAttempts((current) => [attempt, ...current]);
   };
 
   return (
@@ -132,12 +198,14 @@ function App() {
       section={section}
       setSection={setSection}
       theme={theme}
-      setTheme={setTheme}
+      setTheme={setPersistedTheme}
       language={language}
-      setLanguage={setLanguage}
+      setLanguage={setPersistedLanguage}
       collection={collection}
       definitions={definitions}
-      setDefinitions={setDefinitions}
+      onSaveDefinition={(definition) => void saveDefinition(definition)}
+      onDeleteDefinition={(definition) => void removeDefinition(definition)}
+      onGenerateQuestions={(definition) => generateTestQuestions(definition)}
       validationErrors={validationErrors}
       pendingImportConflict={pendingImportConflict}
       onImportCollectionFile={importCollectionFile}
@@ -145,13 +213,19 @@ function App() {
       onResolveImportConflict={resolveImportConflict}
       onCancelImportConflict={cancelImportConflict}
       onResetQuestionBank={() => {
+        void resetQuestionBank();
         setCollection(null);
         setValidationErrors([]);
         setPendingImportConflict(null);
       }}
       completedAttempts={completedAttempts}
-      onAddCompletedAttempt={(attempt) => setCompletedAttempts((current) => [attempt, ...current])}
-      onDeleteAllCompletedTests={() => setCompletedAttempts([])}
+      onAddCompletedAttempt={(attempt, queue, submittedAnswers) =>
+        void addCompletedAttempt(attempt, queue, submittedAnswers)
+      }
+      onDeleteAllCompletedTests={() => {
+        void deleteAllCompletedAttempts();
+        setCompletedAttempts([]);
+      }}
       onUpdateQuestionDifficulty={updateQuestionDifficulty}
     />
   );
