@@ -972,3 +972,65 @@
     width: 100%;
   }
 }
+
+.recovery-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgb(0 0 0 / 0.52);
+  backdrop-filter: blur(6px);
+}
+
+.recovery-modal {
+  width: min(480px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 0.34);
+  padding: 1.35rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.recovery-modal-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.22rem;
+  line-height: 1.25;
+}
+
+.recovery-modal-body {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.recovery-modal-info {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.recovery-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  padding-top: 0.25rem;
+}
+
+@media (max-width: 560px) {
+  .recovery-modal-actions .btn {
+    flex: 1 1 180px;
+  }
+}

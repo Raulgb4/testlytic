@@ -12,6 +12,7 @@ const DEFAULT_ANALYTICS: QuestionAnalytics = {
   userDeclaredDifficulty: "unrated",
   timesAnsweredIncorrectly: 0,
   timesAnsweredCorrectly: 0,
+  exposureCount: 0,
 };
 
 function asString(value: unknown) {

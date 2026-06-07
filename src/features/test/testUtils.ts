@@ -116,8 +116,6 @@ export function calculateAttemptResult(
   }
 
   const completedAtIso = new Date().toISOString();
-  const startedAtMs = new Date(activeAttempt.startedAt).getTime();
-  const completedAtMs = new Date(completedAtIso).getTime();
   const rawScore = correctAnswers;
   const finalScore = definition.negativeMarkingEnabled
     ? correctAnswers - incorrectAnswers * definition.penaltyPerIncorrectAnswer
@@ -135,7 +133,7 @@ export function calculateAttemptResult(
     testTitle: definition.title,
     startedAt: activeAttempt.startedAt,
     completedAt: completedAtIso,
-    durationSeconds: Math.max(0, Math.floor((completedAtMs - startedAtMs) / 1000)),
+    durationSeconds: Math.max(0, activeAttempt.savedElapsedSeconds),
     totalQuestions,
     correctAnswers,
     incorrectAnswers,

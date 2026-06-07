@@ -22,6 +22,7 @@ export type QuestionAnalytics = {
   userDeclaredDifficulty: DifficultyLevel;
   timesAnsweredIncorrectly: number;
   timesAnsweredCorrectly: number;
+  exposureCount: number;
 };
 
 export type CollectionQuestion = {

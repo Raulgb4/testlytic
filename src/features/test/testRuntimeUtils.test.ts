@@ -24,6 +24,7 @@ describe("testRuntimeUtils", () => {
       id: "attempt-1",
       testId: "test-1",
       startedAt: "2026-06-05T10:00:00.000Z",
+      savedElapsedSeconds: 0,
       originalQuestionCount: 3,
       currentQueueIndex: 0,
       draftSelections: {},

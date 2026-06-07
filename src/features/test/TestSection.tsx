@@ -118,6 +118,7 @@ export function TestSection({
   const [finishWarning, setFinishWarning] = useState("");
   const [finishConfirmOpen, setFinishConfirmOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [recoveryBaseTimestamp, setRecoveryBaseTimestamp] = useState(() => Date.now());
   const [difficultyModalOpen, setDifficultyModalOpen] = useState(false);
   const [difficultyTarget, setDifficultyTarget] = useState<{
     questionId: string;
@@ -276,6 +277,7 @@ export function TestSection({
       id: `active-${Date.now()}`,
       testId: definition.id,
       startedAt: new Date().toISOString(),
+      savedElapsedSeconds: 0,
       queue: runtimeQuestions.map((question, index) => ({
         queueId: `${question.id}-attempt-1-${index}`,
         sourceQuestionId: question.id,
@@ -294,6 +296,7 @@ export function TestSection({
     setDifficultyModalOpen(false);
     setDifficultyTarget(null);
     setRecoveredDefinition(null);
+    setRecoveryBaseTimestamp(Date.now());
     setActiveAttempt(nextAttempt);
     onSaveActiveRecovery(definition, nextAttempt);
   };
@@ -301,7 +304,19 @@ export function TestSection({
   const persistActiveAttempt = (nextAttempt: ActiveTestAttempt) => {
     const definition =
       definitions.find((item) => item.id === nextAttempt.testId) || recoveredDefinition;
-    if (definition) onSaveActiveRecovery(definition, nextAttempt);
+    if (!definition) return nextAttempt;
+
+    const extraElapsedSeconds = Math.max(
+      0,
+      Math.floor((Date.now() - recoveryBaseTimestamp) / 1000),
+    );
+    const attemptWithTimer = {
+      ...nextAttempt,
+      savedElapsedSeconds: nextAttempt.savedElapsedSeconds + extraElapsedSeconds,
+    };
+    setRecoveryBaseTimestamp(Date.now());
+    onSaveActiveRecovery(definition, attemptWithTimer);
+    return attemptWithTimer;
   };
 
   const selectDraftAnswer = (queueItem: RuntimeQueueItem, optionId: string) => {
@@ -318,15 +333,14 @@ export function TestSection({
         : [...selectedOptionIds, optionId];
     }
 
-    const nextAttempt = {
+    const nextAttempt = persistActiveAttempt({
       ...activeAttempt,
       draftSelections: {
         ...activeAttempt.draftSelections,
         [queueItem.queueId]: selectedOptionIds,
       },
-    };
+    });
     setActiveAttempt(nextAttempt);
-    persistActiveAttempt(nextAttempt);
     setFinishWarning("");
   };
 
@@ -361,41 +375,35 @@ export function TestSection({
           },
         ];
 
-    const nextAttempt = {
+    const nextAttempt = persistActiveAttempt({
       ...activeAttempt,
       queue: nextQueue,
       submittedAnswers: nextSubmittedAnswers,
-    };
+    });
     setActiveAttempt(nextAttempt);
-    persistActiveAttempt(nextAttempt);
     setFinishWarning("");
   };
 
   const goToPreviousQuestion = () => {
-    if (completionInFlightRef.current) return;
-    setActiveAttempt((current) => {
-      if (!current) return current;
-      const nextAttempt = {
-        ...current,
-        currentQueueIndex: Math.max(0, current.currentQueueIndex - 1),
-      };
-      persistActiveAttempt(nextAttempt);
-      return nextAttempt;
+    if (!activeAttempt || completionInFlightRef.current) return;
+    const nextAttempt = persistActiveAttempt({
+      ...activeAttempt,
+      currentQueueIndex: Math.max(0, activeAttempt.currentQueueIndex - 1),
     });
+    setActiveAttempt(nextAttempt);
     setFinishWarning("");
   };
 
   const goToNextQuestion = () => {
-    if (completionInFlightRef.current) return;
-    setActiveAttempt((current) => {
-      if (!current) return current;
-      const nextAttempt = {
-        ...current,
-        currentQueueIndex: Math.min(current.queue.length - 1, current.currentQueueIndex + 1),
-      };
-      persistActiveAttempt(nextAttempt);
-      return nextAttempt;
+    if (!activeAttempt || completionInFlightRef.current) return;
+    const nextAttempt = persistActiveAttempt({
+      ...activeAttempt,
+      currentQueueIndex: Math.min(
+        activeAttempt.queue.length - 1,
+        activeAttempt.currentQueueIndex + 1,
+      ),
     });
+    setActiveAttempt(nextAttempt);
     setFinishWarning("");
   };
 
@@ -407,13 +415,21 @@ export function TestSection({
   const completeActiveTest = (reason: "manual" | "timeout") => {
     if (!activeAttempt || !activeDefinition || completionInFlightRef.current) return;
     completionInFlightRef.current = true;
-    const result = calculateAttemptResult(activeAttempt, activeDefinition);
+    const extraElapsedSeconds = Math.max(
+      0,
+      Math.floor((Date.now() - recoveryBaseTimestamp) / 1000),
+    );
+    const completedAttempt = {
+      ...activeAttempt,
+      savedElapsedSeconds: activeAttempt.savedElapsedSeconds + extraElapsedSeconds,
+    };
+    const result = calculateAttemptResult(completedAttempt, activeDefinition);
     setFinishConfirmOpen(false);
     setFinishWarning("");
     setDifficultyModalOpen(false);
     setDifficultyTarget(null);
     setResultAttempt({ result, definition: activeDefinition, reason });
-    onCompletedAttempt(result, activeAttempt.queue, activeAttempt.submittedAnswers);
+    onCompletedAttempt(result, completedAttempt.queue, completedAttempt.submittedAnswers);
     onClearActiveRecovery();
     setActiveAttempt(null);
   };
@@ -427,7 +443,11 @@ export function TestSection({
     setResultAttempt(null);
     setDifficultyModalOpen(false);
     setDifficultyTarget(null);
-    setActiveAttempt(pendingActiveRecovery.activeAttempt);
+    setRecoveryBaseTimestamp(Date.now());
+    setActiveAttempt({
+      ...pendingActiveRecovery.activeAttempt,
+      savedElapsedSeconds: pendingActiveRecovery.activeAttempt.savedElapsedSeconds ?? 0,
+    });
   };
 
   const getQuestionDifficulty = (questionId: string) => {
@@ -485,26 +505,59 @@ export function TestSection({
   useEffect(() => {
     if (!activeAttempt || !activeDefinition) return;
     if (getEffectiveTimeLimitMinutes(activeDefinition) <= 0) return;
-    const startedAtMs = new Date(activeAttempt.startedAt).getTime();
-    const elapsedSeconds = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
+    const elapsedSeconds =
+      activeAttempt.savedElapsedSeconds +
+      Math.max(0, Math.floor((nowMs - recoveryBaseTimestamp) / 1000));
     const remainingSeconds = getEffectiveTimeLimitMinutes(activeDefinition) * 60 - elapsedSeconds;
     if (remainingSeconds > 0) return;
     completeActiveTest("timeout");
-  }, [activeAttempt, activeDefinition, nowMs]);
+  }, [activeAttempt, activeDefinition, nowMs, recoveryBaseTimestamp]);
 
   const recoveryModal =
     (pendingActiveRecovery || activeRecoveryLoadError) && !activeAttempt && !resultAttempt ? (
-      <div className="settings-modal-backdrop" role="presentation">
-        <div className="settings-modal finish-confirm-modal" role="dialog" aria-modal="true">
-          <h3>{t("test.recoveryTitle")}</h3>
-          <p>{activeRecoveryLoadError ? t("test.recoveryCorruptBody") : t("test.recoveryBody")}</p>
-          <div className="settings-modal-actions">
-            <button type="button" className="btn btn-danger" onClick={onDiscardActiveRecovery}>
-              {t("test.exitTest")}
-            </button>
+      <div className="recovery-modal-backdrop" role="presentation">
+        <div
+          className="recovery-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="recovery-modal-title"
+        >
+          <h3 id="recovery-modal-title" className="recovery-modal-title">
+            {t("test.recoveryTitle")}
+          </h3>
+          {activeRecoveryLoadError ? (
+            <p className="recovery-modal-body">{t("test.recoveryCorruptBody")}</p>
+          ) : pendingActiveRecovery ? (
+            <>
+              <p className="recovery-modal-body">{t("test.recoveryBody")}</p>
+              <div className="recovery-modal-info">
+                <span>
+                  {t("test.recoveryTestInfo", {
+                    title: pendingActiveRecovery.testDefinition.title,
+                  })}
+                </span>
+                <span>
+                  {t("test.recoveryQuestionCount", {
+                    count: pendingActiveRecovery.activeAttempt.originalQuestionCount,
+                  })}
+                </span>
+                <span>
+                  {t("test.recoveryElapsedTime", {
+                    duration: formatDuration(
+                      pendingActiveRecovery.activeAttempt.savedElapsedSeconds ?? 0,
+                    ),
+                  })}
+                </span>
+              </div>
+            </>
+          ) : null}
+          <div className="recovery-modal-actions">
             {pendingActiveRecovery ? (
               <Button onClick={continueRecoveredTest}>{t("test.continueTest")}</Button>
             ) : null}
+            <button type="button" className="btn btn-danger" onClick={onDiscardActiveRecovery}>
+              {t("test.exitTest")}
+            </button>
           </div>
         </div>
       </div>
@@ -548,10 +601,9 @@ export function TestSection({
           total: activeAttempt.originalQuestionCount,
           gradeOutOf10: 0,
         };
-    const elapsedSeconds = Math.max(
-      0,
-      Math.floor((nowMs - new Date(activeAttempt.startedAt).getTime()) / 1000),
-    );
+    const elapsedSeconds =
+      activeAttempt.savedElapsedSeconds +
+      Math.max(0, Math.floor((nowMs - recoveryBaseTimestamp) / 1000));
     const effectiveTimeLimitMinutes = activeDefinition
       ? getEffectiveTimeLimitMinutes(activeDefinition)
       : 0;

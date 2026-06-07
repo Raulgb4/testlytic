@@ -205,6 +205,9 @@
     "recoveryTitle": "Se encontró un test sin finalizar",
     "recoveryBody": "Tienes un test en curso. Continúa donde lo dejaste o sal y descártalo.",
     "recoveryCorruptBody": "No se pudo restaurar el test sin finalizar guardado. Sal para descartarlo y seguir usando Testlytic.",
+    "recoveryTestInfo": "Test: {title}",
+    "recoveryQuestionCount": "Preguntas: {count}",
+    "recoveryElapsedTime": "Transcurrido: {duration}",
     "continueTest": "Continuar test",
     "exitTest": "Salir del test"
   },
@@ -243,6 +246,8 @@
     "columnType": "Tipo",
     "columnCategory": "Categoría",
     "columnSubcategory": "Subcategoría",
+    "columnSeen": "Vistas",
+    "neverSeen": "Nunca",
     "tableRange": "Mostrando {start}-{end} de {total}",
     "paginationLabel": "Paginación de la tabla de preguntas",
     "pageStatus": "Página {page} de {total}",

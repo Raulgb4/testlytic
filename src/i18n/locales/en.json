@@ -205,6 +205,9 @@
     "recoveryTitle": "Unfinished test found",
     "recoveryBody": "You have a test in progress. Continue where you left off or exit and discard it.",
     "recoveryCorruptBody": "The saved unfinished test could not be restored. Exit to discard it and continue using Testlytic.",
+    "recoveryTestInfo": "Test: {title}",
+    "recoveryQuestionCount": "Questions: {count}",
+    "recoveryElapsedTime": "Elapsed: {duration}",
     "continueTest": "Continue Test",
     "exitTest": "Exit Test"
   },
@@ -243,6 +246,8 @@
     "columnType": "Type",
     "columnCategory": "Category",
     "columnSubcategory": "Subcategory",
+    "columnSeen": "Seen",
+    "neverSeen": "Never",
     "tableRange": "Showing {start}-{end} of {total}",
     "paginationLabel": "Question table pagination",
     "pageStatus": "Page {page} of {total}",

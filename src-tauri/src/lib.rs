@@ -25,6 +25,7 @@ struct QuestionAnalyticsDto {
     user_declared_difficulty: String,
     times_answered_incorrectly: i64,
     times_answered_correctly: i64,
+    exposure_count: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -611,6 +612,7 @@ fn question_from_row(
             user_declared_difficulty: row.get(9)?,
             times_answered_incorrectly: row.get(10)?,
             times_answered_correctly: row.get(11)?,
+            exposure_count: row.get(12)?,
         },
     })
 }
@@ -671,7 +673,8 @@ fn load_all_questions(conn: &Connection) -> rusqlite::Result<Vec<CollectionQuest
     let mut stmt = conn.prepare(
         "SELECT id, question, auxiliary_information, question_type, correct_answer_explanation,
                 question_category, question_subcategory, question_source, computed_difficulty,
-                user_declared_difficulty, times_answered_incorrectly, times_answered_correctly
+                user_declared_difficulty, times_answered_incorrectly, times_answered_correctly,
+                exposure_count
          FROM questions ORDER BY rowid ASC",
     )?;
     let rows = stmt.query_map([], |row| question_from_row(conn, row))?;
@@ -1433,6 +1436,7 @@ mod tests {
                 user_declared_difficulty: difficulty.into(),
                 times_answered_incorrectly: 0,
                 times_answered_correctly: 0,
+                exposure_count: 0,
             },
         }
     }

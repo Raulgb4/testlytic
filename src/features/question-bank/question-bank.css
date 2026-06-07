@@ -223,10 +223,13 @@
 }
 
 .question-table th:nth-child(4),
-.question-table td:nth-child(4),
+.question-table td:nth-child(4) {
+  width: 14%;
+}
+
 .question-table th:nth-child(5),
 .question-table td:nth-child(5) {
-  width: 16.5%;
+  width: 12%;
 }
 
 .question-table td:not(.question-table-question),

@@ -102,6 +102,7 @@ export async function saveCompletedAttempt(
           userDeclaredDifficulty: "unrated",
           timesAnsweredIncorrectly: 0,
           timesAnsweredCorrectly: 0,
+          exposureCount: 0,
         },
       },
       selectedOptionIds: answer?.selectedOptionIds || [],
@@ -132,7 +133,15 @@ export async function updateQuestionDifficulty(questionId: string, difficulty: s
 }
 
 export async function getActiveTestAttempt() {
-  return invoke<ActiveTestRecovery | null>("get_active_test_attempt");
+  const recovery = await invoke<ActiveTestRecovery | null>("get_active_test_attempt");
+  if (!recovery) return null;
+  return {
+    ...recovery,
+    activeAttempt: {
+      ...recovery.activeAttempt,
+      savedElapsedSeconds: recovery.activeAttempt.savedElapsedSeconds ?? 0,
+    },
+  };
 }
 
 export async function saveActiveTestAttempt(recovery: ActiveTestRecovery) {

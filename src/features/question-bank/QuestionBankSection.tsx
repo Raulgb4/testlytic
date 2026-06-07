@@ -434,6 +434,7 @@ function QuestionTable({ t, questions }: { t: Translator; questions: CollectionQ
               <th scope="col">{t("questionBank.columnType")}</th>
               <th scope="col">{t("questionBank.columnCategory")}</th>
               <th scope="col">{t("questionBank.columnSubcategory")}</th>
+              <th scope="col">{t("questionBank.columnSeen")}</th>
             </tr>
           </thead>
           <tbody>
@@ -449,6 +450,11 @@ function QuestionTable({ t, questions }: { t: Translator; questions: CollectionQ
                 </td>
                 <td>{question.questionCategory}</td>
                 <td>{question.questionSubcategory || t("questionBank.noSubcategory")}</td>
+                <td>
+                  {question.analytics.exposureCount > 0
+                    ? question.analytics.exposureCount
+                    : t("questionBank.neverSeen")}
+                </td>
               </tr>
             ))}
           </tbody>

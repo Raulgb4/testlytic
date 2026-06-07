@@ -48,6 +48,7 @@ export type ActiveTestAttempt = {
   id: string;
   testId: string;
   startedAt: string;
+  savedElapsedSeconds: number;
   queue: RuntimeQueueItem[];
   originalQuestionCount: number;
   submittedAnswers: Record<string, RuntimeAnswer | undefined>;

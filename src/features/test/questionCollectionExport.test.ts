@@ -36,6 +36,7 @@ describe("buildQuestionBankExportJson", () => {
             userDeclaredDifficulty: "low",
             timesAnsweredIncorrectly: 2,
             timesAnsweredCorrectly: 4,
+            exposureCount: 0,
           },
         },
       ],
