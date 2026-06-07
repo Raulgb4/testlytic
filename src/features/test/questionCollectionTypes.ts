@@ -16,7 +16,7 @@ export type ImportedQuestion = {
   questionSource?: string;
 };
 
-export type DifficultyLevel = "unrated" | "easy" | "medium" | "hard";
+export type DifficultyLevel = "unrated" | "low" | "medium" | "high";
 
 export type QuestionAnalytics = {
   computedDifficulty: DifficultyLevel;

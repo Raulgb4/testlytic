@@ -10,7 +10,11 @@ import {
   PendingImportConflict,
   replaceExistingQuestions,
 } from "./features/test/questionCollectionImport";
-import { QuestionCollection, ValidationIssue } from "./features/test/questionCollectionTypes";
+import {
+  QuestionAnalytics,
+  QuestionCollection,
+  ValidationIssue,
+} from "./features/test/questionCollectionTypes";
 import { validateQuestionCollectionJson } from "./features/test/questionCollectionValidation";
 import { CompletedTestAttempt, TestDefinition } from "./features/test/testTypes";
 import { createTranslator, Language } from "./i18n";
@@ -96,6 +100,32 @@ function App() {
     return { status: "cancelled" } as const;
   };
 
+  const updateQuestionDifficulty = (
+    questionId: string,
+    difficulty: QuestionAnalytics["userDeclaredDifficulty"],
+  ) => {
+    setCollection((current) => {
+      if (!current) return current;
+
+      let changed = false;
+      const nextQuestions = current.questions.map((question) => {
+        if (question.id !== questionId) return question;
+        if (question.analytics.userDeclaredDifficulty === difficulty) return question;
+
+        changed = true;
+        return {
+          ...question,
+          analytics: {
+            ...question.analytics,
+            userDeclaredDifficulty: difficulty,
+          },
+        };
+      });
+
+      return changed ? buildUpdatedQuestionCollection(current, nextQuestions) : current;
+    });
+  };
+
   return (
     <AppShell
       t={t}
@@ -122,6 +152,7 @@ function App() {
       completedAttempts={completedAttempts}
       onAddCompletedAttempt={(attempt) => setCompletedAttempts((current) => [attempt, ...current])}
       onDeleteAllCompletedTests={() => setCompletedAttempts([])}
+      onUpdateQuestionDifficulty={updateQuestionDifficulty}
     />
   );
 }

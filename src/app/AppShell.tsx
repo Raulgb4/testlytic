@@ -8,7 +8,11 @@ import {
   ImportConflictResolution,
   PendingImportConflict,
 } from "../features/test/questionCollectionImport";
-import { QuestionCollection, ValidationIssue } from "../features/test/questionCollectionTypes";
+import {
+  QuestionAnalytics,
+  QuestionCollection,
+  ValidationIssue,
+} from "../features/test/questionCollectionTypes";
 import { TestSection } from "../features/test/TestSection";
 import { CompletedTestAttempt, TestDefinition } from "../features/test/testTypes";
 import { Language } from "../i18n";
@@ -39,6 +43,7 @@ export function AppShell({
   completedAttempts,
   onAddCompletedAttempt,
   onDeleteAllCompletedTests,
+  onUpdateQuestionDifficulty,
 }: {
   t: Translator;
   section: SectionId;
@@ -62,6 +67,10 @@ export function AppShell({
   completedAttempts: CompletedTestAttempt[];
   onAddCompletedAttempt: (attempt: CompletedTestAttempt) => void;
   onDeleteAllCompletedTests: () => void;
+  onUpdateQuestionDifficulty: (
+    questionId: string,
+    difficulty: QuestionAnalytics["userDeclaredDifficulty"],
+  ) => void;
 }) {
   return (
     <div className="app-shell" data-theme={theme}>
@@ -110,6 +119,7 @@ export function AppShell({
               definitions={definitions}
               setDefinitions={setDefinitions}
               onCompletedAttempt={onAddCompletedAttempt}
+              onUpdateQuestionDifficulty={onUpdateQuestionDifficulty}
               onGoToQuestionBank={() => setSection("questionBank")}
             />
           ) : null}

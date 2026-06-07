@@ -457,6 +457,53 @@
   font-weight: 700;
 }
 
+.runner-card-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -2px;
+}
+
+.runner-difficulty-button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.runner-difficulty-button span {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.runner-difficulty-button:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent-soft) 40%, var(--surface-2));
+  color: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.runner-difficulty-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  outline-offset: 3px;
+  color: var(--accent-strong);
+}
+
+.runner-difficulty-button:active {
+  transform: translateY(0);
+}
+
 .runner-note {
   margin: 0;
   font-size: 1.16rem;
@@ -468,6 +515,30 @@
   display: grid;
   gap: 14px;
   min-width: 0;
+}
+
+.runner-explanation {
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent-soft) 40%, var(--surface));
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.runner-explanation-title {
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.runner-explanation-body {
+  margin: 0;
+  line-height: 1.55;
+  color: var(--text);
 }
 
 .runner-option {
@@ -555,6 +626,193 @@
 
 .test-runner-finish-action .btn {
   min-width: 170px;
+}
+
+.difficulty-modal {
+  width: min(560px, 100%);
+  gap: 14px;
+  padding: 18px;
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+  box-shadow: 0 22px 44px rgb(0 0 0 / 0.2);
+}
+
+.difficulty-modal h3 {
+  font-size: 1.08rem;
+}
+
+.difficulty-modal > p {
+  margin-top: -2px;
+  line-height: 1.5;
+}
+
+.difficulty-modal-question {
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--border));
+  border-radius: 14px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 96%, transparent),
+    color-mix(in srgb, var(--surface) 94%, transparent)
+  );
+  color: var(--text);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.difficulty-selector {
+  margin: 2px 0 0;
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 18px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 96%, transparent),
+    color-mix(in srgb, var(--surface) 92%, transparent)
+  );
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  position: relative;
+  gap: 4px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.03),
+    0 10px 24px rgb(0 0 0 / 0.08);
+}
+
+.difficulty-selector legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.difficulty-selector-thumb {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: calc((100% - 18px) / 3);
+  height: calc(100% - 10px);
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-soft) 86%, var(--surface)),
+    color-mix(in srgb, var(--surface) 92%, transparent)
+  );
+  box-shadow:
+    0 10px 22px color-mix(in srgb, var(--accent) 14%, rgb(0 0 0 / 0.18)),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.difficulty-selector.low .difficulty-selector-thumb {
+  transform: translateX(0%);
+}
+
+.difficulty-selector.medium .difficulty-selector-thumb {
+  transform: translateX(100%);
+}
+
+.difficulty-selector.high .difficulty-selector-thumb {
+  transform: translateX(200%);
+}
+
+.difficulty-selector-option {
+  position: relative;
+  z-index: 1;
+  min-height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+}
+
+.difficulty-selector-option input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.difficulty-selector-option span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100%;
+  min-height: 100%;
+  padding: 0.8rem 0.75rem;
+  border-radius: 12px;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.difficulty-selector-option:hover span {
+  background: color-mix(in srgb, var(--accent-soft) 18%, transparent);
+  color: var(--text);
+}
+
+.difficulty-selector-option.selected {
+  color: var(--accent-strong);
+}
+
+.difficulty-selector-option.selected span {
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.12);
+}
+
+.difficulty-selector-option:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.difficulty-selector-option:active span {
+  transform: scale(0.985);
+}
+
+.difficulty-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.difficulty-modal-actions .btn {
+  min-width: 138px;
+  min-height: 46px;
+}
+
+@media (max-width: 640px) {
+  .difficulty-modal {
+    padding: 16px;
+  }
+
+  .difficulty-selector-option {
+    min-height: 52px;
+  }
+
+  .difficulty-selector-option span {
+    padding: 0.72rem 0.55rem;
+    font-size: 0.86rem;
+  }
+
+  .difficulty-modal-actions {
+    gap: 8px;
+  }
 }
 
 .results-meta-line {

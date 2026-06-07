@@ -33,7 +33,7 @@ describe("buildQuestionBankExportJson", () => {
           questionSource: "Template",
           analytics: {
             computedDifficulty: "medium",
-            userDeclaredDifficulty: "easy",
+            userDeclaredDifficulty: "low",
             timesAnsweredIncorrectly: 2,
             timesAnsweredCorrectly: 4,
           },

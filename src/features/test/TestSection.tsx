@@ -12,7 +12,7 @@ import { Translator } from "../../app/types";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
 import { Toast } from "../../shared/components/Toast";
-import { CollectionQuestion, QuestionCollection } from "./questionCollectionTypes";
+import { CollectionQuestion, DifficultyLevel, QuestionCollection } from "./questionCollectionTypes";
 import {
   ActiveTestAttempt,
   CompletedTestAttempt,
@@ -35,6 +35,14 @@ import {
   isTimeLimitEnabled,
 } from "./testRuntimeUtils";
 import "./test.css";
+
+type RatedDifficulty = Exclude<DifficultyLevel, "unrated">;
+
+const DIFFICULTY_OPTIONS: Array<{ value: RatedDifficulty; labelKey: string }> = [
+  { value: "low", labelKey: "test.difficultyLow" },
+  { value: "medium", labelKey: "test.difficultyMedium" },
+  { value: "high", labelKey: "test.difficultyHigh" },
+];
 
 type TestFormState = {
   title: string;
@@ -66,6 +74,7 @@ export function TestSection({
   definitions,
   setDefinitions,
   onCompletedAttempt,
+  onUpdateQuestionDifficulty,
   onGoToQuestionBank,
 }: {
   t: Translator;
@@ -73,6 +82,7 @@ export function TestSection({
   definitions: TestDefinition[];
   setDefinitions: Dispatch<SetStateAction<TestDefinition[]>>;
   onCompletedAttempt: (attempt: CompletedTestAttempt) => void;
+  onUpdateQuestionDifficulty: (questionId: string, difficulty: DifficultyLevel) => void;
   onGoToQuestionBank: () => void;
 }) {
   const [toast, setToast] = useState<null | { message: string; variant: "success" | "error" }>(
@@ -97,6 +107,12 @@ export function TestSection({
   const [finishWarning, setFinishWarning] = useState("");
   const [finishConfirmOpen, setFinishConfirmOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [difficultyModalOpen, setDifficultyModalOpen] = useState(false);
+  const [difficultyTarget, setDifficultyTarget] = useState<{
+    questionId: string;
+    questionText: string;
+  } | null>(null);
+  const [difficultySelection, setDifficultySelection] = useState<RatedDifficulty>("medium");
   const completionInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -116,6 +132,12 @@ export function TestSection({
     if (activeAttempt) {
       completionInFlightRef.current = false;
     }
+  }, [activeAttempt]);
+
+  useEffect(() => {
+    if (activeAttempt) return;
+    setDifficultyModalOpen(false);
+    setDifficultyTarget(null);
   }, [activeAttempt]);
 
   const bankQuestions = useMemo(() => collection?.questions || [], [collection]);
@@ -262,6 +284,8 @@ export function TestSection({
     setFinishWarning("");
     setFinishConfirmOpen(false);
     setResultAttempt(null);
+    setDifficultyModalOpen(false);
+    setDifficultyTarget(null);
     setActiveAttempt(nextAttempt);
   };
 
@@ -363,9 +387,52 @@ export function TestSection({
     const result = calculateAttemptResult(activeAttempt, activeDefinition);
     setFinishConfirmOpen(false);
     setFinishWarning("");
+    setDifficultyModalOpen(false);
+    setDifficultyTarget(null);
     setResultAttempt({ result, definition: activeDefinition, reason });
     onCompletedAttempt(result);
     setActiveAttempt(null);
+  };
+
+  const getQuestionDifficulty = (questionId: string) => {
+    return (
+      collection?.questions.find((question) => question.id === questionId)?.analytics
+        .userDeclaredDifficulty ?? "unrated"
+    );
+  };
+
+  const getDifficultyLabel = (difficulty: DifficultyLevel) => {
+    switch (difficulty) {
+      case "low":
+        return t("test.difficultyLow");
+      case "medium":
+        return t("test.difficultyMedium");
+      case "high":
+        return t("test.difficultyHigh");
+      default:
+        return t("test.difficultyUnrated");
+    }
+  };
+
+  const openDifficultyModal = (queueItem: RuntimeQueueItem) => {
+    const currentDifficulty = getQuestionDifficulty(queueItem.sourceQuestionId);
+    setDifficultySelection(currentDifficulty === "unrated" ? "medium" : currentDifficulty);
+    setDifficultyTarget({
+      questionId: queueItem.sourceQuestionId,
+      questionText: queueItem.question.question,
+    });
+    setDifficultyModalOpen(true);
+  };
+
+  const closeDifficultyModal = () => {
+    setDifficultyModalOpen(false);
+    setDifficultyTarget(null);
+  };
+
+  const saveQuestionDifficulty = () => {
+    if (!difficultyTarget) return;
+    onUpdateQuestionDifficulty(difficultyTarget.questionId, difficultySelection);
+    closeDifficultyModal();
   };
 
   const requestFinishConfirmation = () => {
@@ -411,6 +478,7 @@ export function TestSection({
     const currentQuestion = currentQueueItem.question;
     const currentAnswer = activeAttempt.submittedAnswers[currentQueueItem.queueId];
     const currentDraft = activeAttempt.draftSelections[currentQueueItem.queueId] || [];
+    const currentDifficulty = getQuestionDifficulty(currentQueueItem.sourceQuestionId);
     const allowUnanswered = activeDefinition?.allowUnanswered || false;
     const hasSubmittedCurrentAnswer = Boolean(currentAnswer);
     const hasNextQuestion = activeAttempt.currentQueueIndex < activeAttempt.queue.length - 1;
@@ -440,6 +508,11 @@ export function TestSection({
     const visibleCategory = currentQuestion.questionSubcategory
       ? `${currentQuestion.questionCategory} / ${currentQuestion.questionSubcategory}`
       : currentQuestion.questionCategory;
+    const answerExplanation = currentQuestion.correctAnswerExplanation?.trim() || "";
+    const difficultyButtonLabel =
+      currentDifficulty === "unrated"
+        ? t("test.rateDifficulty")
+        : `${t("test.rateDifficulty")} (${getDifficultyLabel(currentDifficulty)})`;
 
     return (
       <div className="test-runner-full">
@@ -489,6 +562,17 @@ export function TestSection({
           title={t("test.questionTitle", { number: activeAttempt.currentQueueIndex + 1 })}
           className="test-runner-card"
         >
+          <div className="runner-card-toolbar">
+            <button
+              type="button"
+              className="runner-difficulty-button"
+              onClick={() => openDifficultyModal(currentQueueItem)}
+              aria-label={difficultyButtonLabel}
+              title={difficultyButtonLabel}
+            >
+              <span aria-hidden="true">i</span>
+            </button>
+          </div>
           <p className="runner-question">{currentQuestion.question}</p>
           {currentQuestion.auxiliaryInformation ? (
             <p className="runner-note">{currentQuestion.auxiliaryInformation}</p>
@@ -521,6 +605,13 @@ export function TestSection({
               );
             })}
           </div>
+
+          {hasSubmittedCurrentAnswer && answerExplanation ? (
+            <div className="runner-explanation" aria-live="polite">
+              <p className="runner-explanation-title">{t("test.explanation")}</p>
+              <p className="runner-explanation-body">{answerExplanation}</p>
+            </div>
+          ) : null}
 
           <div className="test-runner-footer">
             <div className="test-runner-footer-main">
@@ -582,6 +673,52 @@ export function TestSection({
                 >
                   {t("test.finishConfirmAction")}
                 </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {difficultyModalOpen && difficultyTarget ? (
+          <div className="settings-modal-backdrop" role="presentation">
+            <div
+              className="settings-modal difficulty-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="difficulty-modal-title"
+            >
+              <h3 id="difficulty-modal-title">{t("test.difficultyModalTitle")}</h3>
+              <p>{t("test.difficultyModalBody")}</p>
+              <div className="difficulty-modal-question">{difficultyTarget.questionText}</div>
+
+              <fieldset className={`difficulty-selector difficulty-${difficultySelection}`}>
+                <legend>{t("test.rateDifficulty")}</legend>
+                <span className="difficulty-selector-thumb" aria-hidden="true" />
+                {DIFFICULTY_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className={
+                      difficultySelection === option.value
+                        ? "difficulty-selector-option selected"
+                        : "difficulty-selector-option"
+                    }
+                  >
+                    <input
+                      type="radio"
+                      name="question-difficulty"
+                      value={option.value}
+                      checked={difficultySelection === option.value}
+                      onChange={() => setDifficultySelection(option.value)}
+                    />
+                    <span>{t(option.labelKey)}</span>
+                  </label>
+                ))}
+              </fieldset>
+
+              <div className="settings-modal-actions difficulty-modal-actions">
+                <Button variant="secondary" onClick={closeDifficultyModal}>
+                  {t("test.cancel")}
+                </Button>
+                <Button onClick={saveQuestionDifficulty}>{t("test.saveDifficulty")}</Button>
               </div>
             </div>
           </div>
