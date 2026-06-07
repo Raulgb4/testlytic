@@ -28,6 +28,13 @@ struct QuestionAnalyticsDto {
     exposure_count: i64,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct QuestionExposureDto {
+    question_id: String,
+    exposure_count: i64,
+}
+
 #[derive(Debug, Clone)]
 struct QuestionSelectionStats {
     exposure_count: i64,
@@ -656,6 +663,28 @@ fn load_question_selection_stats(
     .optional()
 }
 
+fn load_question_exposures(
+    conn: &Connection,
+    question_ids: &[String],
+) -> rusqlite::Result<Vec<QuestionExposureDto>> {
+    if question_ids.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let mut query = String::from("SELECT id, exposure_count FROM questions WHERE id IN (");
+    query.push_str(&vec!["?"; question_ids.len()].join(", "));
+    query.push(')');
+
+    let mut stmt = conn.prepare(&query)?;
+    let rows = stmt.query_map(params_from_iter(question_ids.iter()), |row| {
+        Ok(QuestionExposureDto {
+            question_id: row.get(0)?,
+            exposure_count: row.get(1)?,
+        })
+    })?;
+    rows.collect()
+}
+
 fn is_option_correct(
     conn: &Connection,
     question_id: &str,
@@ -1263,10 +1292,11 @@ fn generate_test_questions(
 fn save_completed_attempt(
     state: State<'_, DbState>,
     request: SaveCompletedAttemptRequest,
-) -> CommandResult<()> {
+) -> CommandResult<Vec<QuestionExposureDto>> {
     let mut conn = state.conn.lock().map_err(|error| error.to_string())?;
     let tx = conn.transaction().map_err(|error| error.to_string())?;
     let attempt = &request.attempt;
+    let mut original_question_ids = Vec::new();
     tx.execute(
         "INSERT OR REPLACE INTO test_attempts(id, test_definition_id, test_title, started_at, completed_at, duration_seconds, total_questions, correct_answers, incorrect_answers, unanswered_questions, raw_score, final_score, accuracy_percentage, grade_out_of_10, retry_attempts, retry_correct_answers, retry_incorrect_answers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         params![attempt.id, attempt.test_id, attempt.test_title, attempt.started_at, attempt.completed_at, attempt.duration_seconds, attempt.total_questions, attempt.correct_answers, attempt.incorrect_answers, attempt.unanswered_questions, attempt.raw_score, attempt.final_score, attempt.accuracy_percentage, attempt.grade_out_of_10, attempt.retry_attempts, attempt.retry_correct_answers, attempt.retry_incorrect_answers],
@@ -1285,11 +1315,16 @@ fn save_completed_attempt(
         tx.execute("INSERT INTO test_attempt_category_results(attempt_id, category, correct, incorrect, unanswered, total, accuracy_percentage) VALUES (?, ?, ?, ?, ?, ?, ?)", params![attempt.id, category.category, category.correct, category.incorrect, category.unanswered, category.total, category.accuracy_percentage]).map_err(|error| error.to_string())?;
     }
     for answer in &request.answers {
+        if answer.retry_number == 0 && !original_question_ids.contains(&answer.source_question_id) {
+            original_question_ids.push(answer.source_question_id.clone());
+        }
         tx.execute("INSERT INTO test_attempt_answers(attempt_id, queue_id, source_question_id, retry_number, question_snapshot, selected_option_ids_json, correct_option_ids_json, is_correct, is_unanswered, answered_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", params![attempt.id, answer.queue_id, answer.source_question_id, answer.retry_number, serde_json::to_string(&answer.question).map_err(|error| error.to_string())?, serde_json::to_string(&answer.selected_option_ids).map_err(|error| error.to_string())?, serde_json::to_string(&answer.correct_option_ids).map_err(|error| error.to_string())?, answer.is_correct as i64, answer.is_unanswered as i64, answer.answered_at]).map_err(|error| error.to_string())?;
     }
     rebuild_question_selection_stats(&tx).map_err(|error| error.to_string())?;
+    let exposures = load_question_exposures(&tx, &original_question_ids)
+        .map_err(|error| error.to_string())?;
     tx.commit().map_err(|error| error.to_string())?;
-    Ok(())
+    Ok(exposures)
 }
 
 fn load_attempts(conn: &Connection) -> rusqlite::Result<Vec<CompletedAttemptDto>> {

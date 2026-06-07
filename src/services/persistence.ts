@@ -39,6 +39,11 @@ export type ActiveTestRecovery = {
   appVersion?: string;
 };
 
+export type QuestionExposureUpdate = {
+  questionId: string;
+  exposureCount: number;
+};
+
 export async function getPreferences() {
   return invoke<StoredPreferences>("get_preferences");
 }
@@ -113,7 +118,9 @@ export async function saveCompletedAttempt(
     };
   });
 
-  return invoke<void>("save_completed_attempt", { request: { attempt, answers } });
+  return invoke<QuestionExposureUpdate[]>("save_completed_attempt", {
+    request: { attempt, answers },
+  });
 }
 
 export async function listCompletedAttempts() {

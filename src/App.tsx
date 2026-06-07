@@ -39,6 +39,7 @@ import {
   updateQuestionDifficulty as persistQuestionDifficulty,
   clearActiveTestAttempt,
   ActiveTestRecovery,
+  QuestionExposureUpdate,
 } from "./services/persistence";
 
 type ThemeMode = "dark" | "light";
@@ -191,6 +192,39 @@ function App() {
     void persistQuestionDifficulty(questionId, difficulty);
   };
 
+  const applyQuestionExposureUpdates = (updates: QuestionExposureUpdate[]) => {
+    if (updates.length === 0) return;
+
+    setCollection((current) => {
+      if (!current) return current;
+
+      const exposureByQuestionId = new Map(
+        updates.map((update) => [update.questionId, update.exposureCount]),
+      );
+      let changed = false;
+      const nextQuestions = current.questions.map((question) => {
+        const nextExposureCount = exposureByQuestionId.get(question.id);
+        if (
+          nextExposureCount === undefined ||
+          question.analytics.exposureCount === nextExposureCount
+        ) {
+          return question;
+        }
+
+        changed = true;
+        return {
+          ...question,
+          analytics: {
+            ...question.analytics,
+            exposureCount: nextExposureCount,
+          },
+        };
+      });
+
+      return changed ? buildUpdatedQuestionCollection(current, nextQuestions) : current;
+    });
+  };
+
   const saveDefinition = async (definition: TestDefinition) => {
     await saveTestDefinition(definition);
     setDefinitions((current) => {
@@ -211,7 +245,8 @@ function App() {
     queue: RuntimeQueueItem[],
     submittedAnswers: Record<string, RuntimeAnswer | undefined>,
   ) => {
-    await saveCompletedAttempt(attempt, queue, submittedAnswers);
+    const exposureUpdates = await saveCompletedAttempt(attempt, queue, submittedAnswers);
+    applyQuestionExposureUpdates(exposureUpdates);
     setCompletedAttempts((current) => [attempt, ...current]);
   };
 
@@ -274,8 +309,28 @@ function App() {
         void addCompletedAttempt(attempt, queue, submittedAnswers)
       }
       onDeleteAllCompletedTests={() => {
-        void deleteAllCompletedAttempts();
-        setCompletedAttempts([]);
+        void deleteAllCompletedAttempts().then(() => {
+          setCompletedAttempts([]);
+          setCollection((current) => {
+            if (!current) return current;
+
+            let changed = false;
+            const nextQuestions = current.questions.map((question) => {
+              if (question.analytics.exposureCount === 0) return question;
+
+              changed = true;
+              return {
+                ...question,
+                analytics: {
+                  ...question.analytics,
+                  exposureCount: 0,
+                },
+              };
+            });
+
+            return changed ? buildUpdatedQuestionCollection(current, nextQuestions) : current;
+          });
+        });
       }}
       onUpdateQuestionDifficulty={updateQuestionDifficulty}
     />
