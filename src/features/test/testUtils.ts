@@ -43,15 +43,10 @@ export function getMatchingQuestions(
 }
 
 export function buildRuntimeQuestions(
-  definition: TestDefinition,
-  bankQuestions: CollectionQuestion[],
+  _definition: TestDefinition,
+  selectedQuestions: CollectionQuestion[],
 ) {
-  const matching = getMatchingQuestions(definition, bankQuestions);
-  const limited = shuffleArray(matching).slice(
-    0,
-    Math.min(definition.questionLimit, matching.length),
-  );
-  return limited.map<RuntimeQuestion>((question) => ({
+  return selectedQuestions.map<RuntimeQuestion>((question) => ({
     id: question.id,
     question: question.question,
     auxiliaryInformation: question.auxiliaryInformation,
