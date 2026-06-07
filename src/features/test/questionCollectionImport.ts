@@ -1,61 +1,61 @@
-import { buildQuestionCollectionSummary } from "./questionCollectionValidation";
+import {
+  buildQuestionCollectionSummary,
+  buildQuestionContentFingerprint,
+  generateInternalQuestionId,
+} from "./questionCollectionValidation";
 import { CollectionQuestion, QuestionCollection } from "./questionCollectionTypes";
 
-export type ImportConflictResolution = "newIds" | "replaceExisting";
+export type ImportConflictResolution = "importCopies" | "replaceExisting";
+
+export type DuplicateQuestionPreview = {
+  fingerprint: string;
+  question: string;
+};
 
 export type PendingImportConflict = {
   incomingCollection: QuestionCollection;
-  duplicateIds: string[];
+  duplicateQuestions: DuplicateQuestionPreview[];
 };
 
 export type ImportCollectionResult =
   | { status: "imported" }
-  | { status: "conflict"; duplicateIds: string[] }
+  | { status: "conflict"; duplicateQuestions: DuplicateQuestionPreview[] }
   | { status: "invalid" }
   | { status: "cancelled" };
 
-export function findDuplicateQuestionIds(
+function getQuestionFingerprint(question: CollectionQuestion) {
+  return buildQuestionContentFingerprint(question);
+}
+
+export function findDuplicateQuestions(
   existingQuestions: CollectionQuestion[],
   incomingQuestions: CollectionQuestion[],
 ) {
-  const existingIds = new Set(existingQuestions.map((question) => question.id));
-  const duplicateIds: string[] = [];
+  const existingFingerprints = new Set(existingQuestions.map(getQuestionFingerprint));
+  const duplicateQuestions: DuplicateQuestionPreview[] = [];
 
   for (const question of incomingQuestions) {
-    if (existingIds.has(question.id)) {
-      duplicateIds.push(question.id);
+    const fingerprint = getQuestionFingerprint(question);
+    if (existingFingerprints.has(fingerprint)) {
+      duplicateQuestions.push({ fingerprint, question: question.question });
     }
   }
 
-  return duplicateIds;
+  return duplicateQuestions;
 }
 
-export function generateUniqueQuestionId(baseId: string, usedIds: Set<string>) {
-  let nextId = `${baseId}-copy`;
-  let index = 2;
-  while (usedIds.has(nextId)) {
-    nextId = `${baseId}-copy-${index}`;
-    index += 1;
-  }
-  usedIds.add(nextId);
-  return nextId;
-}
-
-export function importQuestionsWithNewIds(
+export function importQuestionsAsCopies(
   existingQuestions: CollectionQuestion[],
   incomingQuestions: CollectionQuestion[],
 ) {
-  const existingIds = new Set(existingQuestions.map((question) => question.id));
-  const usedIds = new Set([...existingIds, ...incomingQuestions.map((question) => question.id)]);
+  const usedIds = new Set(existingQuestions.map((question) => question.id));
 
   const normalizedIncoming = incomingQuestions.map((question) => {
-    if (!existingIds.has(question.id)) {
-      return question;
-    }
+    const fingerprint = getQuestionFingerprint(question);
 
     return {
       ...question,
-      id: generateUniqueQuestionId(question.id, usedIds),
+      id: generateInternalQuestionId(fingerprint, usedIds),
     };
   });
 
@@ -66,14 +66,37 @@ export function replaceExistingQuestions(
   existingQuestions: CollectionQuestion[],
   incomingQuestions: CollectionQuestion[],
 ) {
-  const incomingById = new Map(incomingQuestions.map((question) => [question.id, question]));
-  const mergedQuestions = existingQuestions.map(
-    (question) => incomingById.get(question.id) || question,
-  );
-
+  const incomingByFingerprint = new Map<string, CollectionQuestion[]>();
   for (const question of incomingQuestions) {
-    if (!existingQuestions.some((existing) => existing.id === question.id)) {
-      mergedQuestions.push(question);
+    const fingerprint = getQuestionFingerprint(question);
+    incomingByFingerprint.set(fingerprint, [
+      ...(incomingByFingerprint.get(fingerprint) || []),
+      question,
+    ]);
+  }
+
+  const mergedQuestions = existingQuestions.map((question) => {
+    const fingerprint = getQuestionFingerprint(question);
+    const incomingQuestionsForFingerprint = incomingByFingerprint.get(fingerprint) || [];
+    const incomingQuestion = incomingQuestionsForFingerprint.shift();
+    if (!incomingQuestion) return question;
+
+    return {
+      ...incomingQuestion,
+      id: question.id,
+      analytics: question.analytics,
+    };
+  });
+
+  const usedIds = new Set(mergedQuestions.map((question) => question.id));
+
+  for (const [fingerprint, questions] of incomingByFingerprint.entries()) {
+    for (const question of questions) {
+      const nextId = usedIds.has(question.id)
+        ? generateInternalQuestionId(fingerprint, usedIds)
+        : question.id;
+      usedIds.add(nextId);
+      mergedQuestions.push({ ...question, id: nextId });
     }
   }
 

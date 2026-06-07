@@ -5,6 +5,7 @@ import { Card } from "../../shared/components/Card";
 import { Toast } from "../../shared/components/Toast";
 import { QuestionCollectionOnboarding } from "../test/QuestionCollectionOnboarding";
 import {
+  DuplicateQuestionPreview,
   ImportCollectionResult,
   ImportConflictResolution,
   PendingImportConflict,
@@ -94,7 +95,7 @@ export function QuestionBankSection({
     if (result.status !== "imported") return;
     setToast({
       message:
-        resolution === "newIds"
+        resolution === "importCopies"
           ? t("questionBank.importResolvedNewIdsSuccess")
           : t("questionBank.importResolvedReplaceSuccess"),
       variant: "success",
@@ -122,7 +123,7 @@ export function QuestionBankSection({
         {pendingImportConflict ? (
           <ImportConflictModal
             t={t}
-            duplicateIds={pendingImportConflict.duplicateIds}
+            duplicateQuestions={pendingImportConflict.duplicateQuestions}
             onResolve={resolveConflict}
             onCancel={cancelConflict}
           />
@@ -215,7 +216,7 @@ export function QuestionBankSection({
       {pendingImportConflict ? (
         <ImportConflictModal
           t={t}
-          duplicateIds={pendingImportConflict.duplicateIds}
+          duplicateQuestions={pendingImportConflict.duplicateQuestions}
           onResolve={resolveConflict}
           onCancel={cancelConflict}
         />
@@ -235,17 +236,17 @@ export function QuestionBankSection({
 
 function ImportConflictModal({
   t,
-  duplicateIds,
+  duplicateQuestions,
   onResolve,
   onCancel,
 }: {
   t: Translator;
-  duplicateIds: string[];
+  duplicateQuestions: DuplicateQuestionPreview[];
   onResolve: (resolution: ImportConflictResolution) => void;
   onCancel: () => void;
 }) {
-  const visibleIds = duplicateIds.slice(0, 5);
-  const remainingCount = Math.max(0, duplicateIds.length - visibleIds.length);
+  const visibleQuestions = duplicateQuestions.slice(0, 5);
+  const remainingCount = Math.max(0, duplicateQuestions.length - visibleQuestions.length);
 
   return (
     <div className="settings-modal-backdrop" role="presentation">
@@ -256,15 +257,15 @@ function ImportConflictModal({
         <div className="import-conflict-summary">
           <MetricLine
             label={t("questionBank.importConflictDuplicateCount")}
-            value={String(duplicateIds.length)}
+            value={String(duplicateQuestions.length)}
           />
         </div>
 
         <div className="import-conflict-id-list">
           <span>{t("questionBank.importConflictExamples")}</span>
           <ul>
-            {visibleIds.map((id) => (
-              <li key={id}>{id}</li>
+            {visibleQuestions.map((duplicate, index) => (
+              <li key={`${duplicate.fingerprint}-${index}`}>{duplicate.question}</li>
             ))}
           </ul>
           {remainingCount > 0 ? (
@@ -284,7 +285,11 @@ function ImportConflictModal({
         </div>
 
         <div className="import-conflict-actions">
-          <button type="button" className="btn btn-primary" onClick={() => onResolve("newIds")}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => onResolve("importCopies")}
+          >
             {t("questionBank.importConflictNewIds")}
           </button>
           <button
@@ -333,10 +338,7 @@ function QuestionTable({ t, questions }: { t: Translator; questions: CollectionQ
       if (subcategory && question.questionSubcategory !== subcategory) return false;
       if (questionType && question.questionType !== questionType) return false;
       if (!normalizedQuery) return true;
-      return (
-        question.id.toLowerCase().includes(normalizedQuery) ||
-        question.question.toLowerCase().includes(normalizedQuery)
-      );
+      return question.question.toLowerCase().includes(normalizedQuery);
     });
   }, [category, query, questionType, questions, subcategory]);
 
@@ -422,7 +424,6 @@ function QuestionTable({ t, questions }: { t: Translator; questions: CollectionQ
         <table className="question-table">
           <thead>
             <tr>
-              <th scope="col">{t("questionBank.columnId")}</th>
               <th scope="col">{t("questionBank.columnQuestion")}</th>
               <th scope="col">{t("questionBank.columnType")}</th>
               <th scope="col">{t("questionBank.columnCategory")}</th>
@@ -432,7 +433,6 @@ function QuestionTable({ t, questions }: { t: Translator; questions: CollectionQ
           <tbody>
             {visibleQuestions.map((question) => (
               <tr key={question.id}>
-                <td>{question.id}</td>
                 <td className="question-table-question" title={question.question}>
                   {question.question}
                 </td>

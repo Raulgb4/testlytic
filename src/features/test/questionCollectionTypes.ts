@@ -4,7 +4,6 @@ export type ImportedQuestionCollection = {
 };
 
 export type ImportedQuestion = {
-  id: string;
   question: string;
   auxiliaryInformation?: string;
   questionType: "single_choice" | "multiple_choice";

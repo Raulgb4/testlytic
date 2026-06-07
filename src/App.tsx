@@ -3,10 +3,10 @@ import { AppShell } from "./app/AppShell";
 import { SectionId } from "./app/navigation";
 import {
   buildUpdatedQuestionCollection,
-  findDuplicateQuestionIds,
+  findDuplicateQuestions,
   ImportCollectionResult,
   ImportConflictResolution,
-  importQuestionsWithNewIds,
+  importQuestionsAsCopies,
   PendingImportConflict,
   replaceExistingQuestions,
 } from "./features/test/questionCollectionImport";
@@ -48,18 +48,18 @@ function App() {
     }
 
     if (merge && collection) {
-      const duplicateIds = findDuplicateQuestionIds(
+      const duplicateQuestions = findDuplicateQuestions(
         collection.questions,
         validation.collection.questions,
       );
 
-      if (duplicateIds.length > 0) {
+      if (duplicateQuestions.length > 0) {
         setValidationErrors([]);
         setPendingImportConflict({
           incomingCollection: validation.collection,
-          duplicateIds,
+          duplicateQuestions,
         });
-        return { status: "conflict", duplicateIds };
+        return { status: "conflict", duplicateQuestions };
       }
 
       const mergedQuestions = [...collection.questions, ...validation.collection.questions];
@@ -84,7 +84,7 @@ function App() {
             collection.questions,
             pendingImportConflict.incomingCollection.questions,
           )
-        : importQuestionsWithNewIds(
+        : importQuestionsAsCopies(
             collection.questions,
             pendingImportConflict.incomingCollection.questions,
           );

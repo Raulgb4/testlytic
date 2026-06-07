@@ -8,7 +8,6 @@ export const QUESTION_COLLECTION_TEMPLATE: ImportedQuestionCollection = {
   version: "1",
   questions: [
     {
-      id: "q-001",
       question: "Which metric best tracks study consistency over time?",
       auxiliaryInformation: "Pick the most representative analytics metric.",
       questionType: "single_choice",

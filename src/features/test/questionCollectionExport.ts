@@ -9,7 +9,6 @@ export const QUESTION_BANK_EXPORT_FILE_NAME = "testlytic-question-bank.json";
 
 function toExportQuestion(question: QuestionCollection["questions"][number]): ImportedQuestion {
   return {
-    id: question.id,
     question: question.question,
     auxiliaryInformation: question.auxiliaryInformation,
     questionType: question.questionType,

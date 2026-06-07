@@ -25,6 +25,65 @@ function optionalString(value: unknown) {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function normalizeFingerprintString(value?: string) {
+  return (value || "").trim().replace(/\s+/g, " ");
+}
+
+function hashString(value: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36).padStart(7, "0");
+}
+
+export function buildQuestionContentFingerprint(
+  question: Pick<
+    CollectionQuestion,
+    | "question"
+    | "auxiliaryInformation"
+    | "questionType"
+    | "options"
+    | "correctOptions"
+    | "correctAnswerExplanation"
+    | "questionCategory"
+    | "questionSubcategory"
+    | "questionSource"
+  >,
+) {
+  return hashString(
+    JSON.stringify({
+      question: normalizeFingerprintString(question.question),
+      auxiliaryInformation: normalizeFingerprintString(question.auxiliaryInformation),
+      questionType: question.questionType,
+      options: question.options.map((option) => ({
+        id: normalizeFingerprintString(option.id),
+        text: normalizeFingerprintString(option.text),
+      })),
+      correctOptions: [...question.correctOptions].map(normalizeFingerprintString).sort(),
+      correctAnswerExplanation: normalizeFingerprintString(question.correctAnswerExplanation),
+      questionCategory: normalizeFingerprintString(question.questionCategory),
+      questionSubcategory: normalizeFingerprintString(question.questionSubcategory),
+      questionSource: normalizeFingerprintString(question.questionSource),
+    }),
+  );
+}
+
+export function generateInternalQuestionId(fingerprint: string, usedIds: Set<string>) {
+  const baseId = `q_${fingerprint}`;
+  let nextId = baseId;
+  let suffix = 2;
+
+  while (usedIds.has(nextId)) {
+    nextId = `${baseId}_${suffix}`;
+    suffix += 1;
+  }
+
+  usedIds.add(nextId);
+  return nextId;
+}
+
 export function buildQuestionCollectionSummary(
   questions: CollectionQuestion[],
 ): QuestionCollectionSummary {
@@ -84,7 +143,7 @@ export function validateQuestionCollectionJson(raw: string): ValidationResult {
   if (errors.length > 0) return { ok: false, errors };
 
   const sourceQuestions = input.questions as unknown[];
-  const seenQuestionIds = new Set<string>();
+  const usedQuestionIds = new Set<string>();
   const normalizedQuestions: CollectionQuestion[] = [];
 
   sourceQuestions.forEach((entry, index) => {
@@ -95,15 +154,6 @@ export function validateQuestionCollectionJson(raw: string): ValidationResult {
     }
 
     const question = entry as Record<string, unknown>;
-    const id = asString(question.id);
-    if (!id) {
-      errors.push({ path: `${path}.id`, message: "Question ID is required." });
-    } else if (seenQuestionIds.has(id)) {
-      errors.push({ path: `${path}.id`, message: "Question ID must be unique." });
-    } else {
-      seenQuestionIds.add(id);
-    }
-
     const prompt = asString(question.question);
     if (!prompt) {
       errors.push({ path: `${path}.question`, message: "Question text is required." });
@@ -235,13 +285,24 @@ export function validateQuestionCollectionJson(raw: string): ValidationResult {
     const hasBlockingError = errors.some((error) => error.path.startsWith(path));
     if (
       !hasBlockingError &&
-      id &&
       prompt &&
       category &&
       (type === "single_choice" || type === "multiple_choice")
     ) {
+      const questionFingerprint = buildQuestionContentFingerprint({
+        question: prompt,
+        auxiliaryInformation: optionalAux || undefined,
+        questionType: type,
+        options: normalizedOptions,
+        correctOptions: normalizedCorrectOptions,
+        correctAnswerExplanation: optionalExplanation || undefined,
+        questionCategory: category,
+        questionSubcategory: optionalSubcategory || undefined,
+        questionSource: optionalSource || undefined,
+      });
+
       normalizedQuestions.push({
-        id,
+        id: generateInternalQuestionId(questionFingerprint, usedQuestionIds),
         question: prompt,
         auxiliaryInformation: optionalAux || undefined,
         questionType: type,
