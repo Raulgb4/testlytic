@@ -1,7 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Language } from "../i18n";
 import { QuestionCollection } from "../features/test/questionCollectionTypes";
-import { CompletedTestAttempt, RuntimeQueueItem, TestDefinition } from "../features/test/testTypes";
+import {
+  ActiveTestAttempt,
+  CompletedTestAttempt,
+  RuntimeQueueItem,
+  TestDefinition,
+} from "../features/test/testTypes";
 
 type ThemeMode = "dark" | "light";
 
@@ -24,6 +29,14 @@ export type AttemptAnswerSnapshot = {
   isCorrect: boolean;
   isUnanswered: boolean;
   answeredAt?: string;
+};
+
+export type ActiveTestRecovery = {
+  id: string;
+  testDefinition: TestDefinition;
+  activeAttempt: ActiveTestAttempt;
+  savedAt: string;
+  appVersion?: string;
 };
 
 export async function getPreferences() {
@@ -116,4 +129,16 @@ export async function resetQuestionBank() {
 
 export async function updateQuestionDifficulty(questionId: string, difficulty: string) {
   return invoke<void>("update_question_difficulty", { questionId, difficulty });
+}
+
+export async function getActiveTestAttempt() {
+  return invoke<ActiveTestRecovery | null>("get_active_test_attempt");
+}
+
+export async function saveActiveTestAttempt(recovery: ActiveTestRecovery) {
+  return invoke<void>("save_active_test_attempt", { recovery });
+}
+
+export async function clearActiveTestAttempt() {
+  return invoke<void>("clear_active_test_attempt");
 }

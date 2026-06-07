@@ -3,6 +3,7 @@ import { Translator } from "../../app/types";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
 import { Toast } from "../../shared/components/Toast";
+import { ActiveTestRecovery } from "../../services/persistence";
 import { CollectionQuestion, DifficultyLevel, QuestionCollection } from "./questionCollectionTypes";
 import {
   ActiveTestAttempt,
@@ -66,6 +67,11 @@ export function TestSection({
   onSaveDefinition,
   onDeleteDefinition,
   onGenerateQuestions,
+  pendingActiveRecovery,
+  activeRecoveryLoadError,
+  onSaveActiveRecovery,
+  onClearActiveRecovery,
+  onDiscardActiveRecovery,
   onCompletedAttempt,
   onUpdateQuestionDifficulty,
   onGoToQuestionBank,
@@ -76,6 +82,11 @@ export function TestSection({
   onSaveDefinition: (definition: TestDefinition) => void;
   onDeleteDefinition: (definition: TestDefinition) => void;
   onGenerateQuestions: (definition: TestDefinition) => Promise<QuestionCollection["questions"]>;
+  pendingActiveRecovery: ActiveTestRecovery | null;
+  activeRecoveryLoadError: boolean;
+  onSaveActiveRecovery: (definition: TestDefinition, activeAttempt: ActiveTestAttempt) => void;
+  onClearActiveRecovery: () => void;
+  onDiscardActiveRecovery: () => void;
   onCompletedAttempt: (
     attempt: CompletedTestAttempt,
     queue: RuntimeQueueItem[],
@@ -98,6 +109,7 @@ export function TestSection({
   const penaltyInputRef = useRef<HTMLInputElement | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TestDefinition | null>(null);
   const [activeAttempt, setActiveAttempt] = useState<ActiveTestAttempt | null>(null);
+  const [recoveredDefinition, setRecoveredDefinition] = useState<TestDefinition | null>(null);
   const [resultAttempt, setResultAttempt] = useState<{
     result: TestAttempt;
     definition: TestDefinition;
@@ -281,7 +293,15 @@ export function TestSection({
     setResultAttempt(null);
     setDifficultyModalOpen(false);
     setDifficultyTarget(null);
+    setRecoveredDefinition(null);
     setActiveAttempt(nextAttempt);
+    onSaveActiveRecovery(definition, nextAttempt);
+  };
+
+  const persistActiveAttempt = (nextAttempt: ActiveTestAttempt) => {
+    const definition =
+      definitions.find((item) => item.id === nextAttempt.testId) || recoveredDefinition;
+    if (definition) onSaveActiveRecovery(definition, nextAttempt);
   };
 
   const selectDraftAnswer = (queueItem: RuntimeQueueItem, optionId: string) => {
@@ -298,13 +318,15 @@ export function TestSection({
         : [...selectedOptionIds, optionId];
     }
 
-    setActiveAttempt({
+    const nextAttempt = {
       ...activeAttempt,
       draftSelections: {
         ...activeAttempt.draftSelections,
         [queueItem.queueId]: selectedOptionIds,
       },
-    });
+    };
+    setActiveAttempt(nextAttempt);
+    persistActiveAttempt(nextAttempt);
     setFinishWarning("");
   };
 
@@ -339,11 +361,13 @@ export function TestSection({
           },
         ];
 
-    setActiveAttempt({
+    const nextAttempt = {
       ...activeAttempt,
       queue: nextQueue,
       submittedAnswers: nextSubmittedAnswers,
-    });
+    };
+    setActiveAttempt(nextAttempt);
+    persistActiveAttempt(nextAttempt);
     setFinishWarning("");
   };
 
@@ -351,10 +375,12 @@ export function TestSection({
     if (completionInFlightRef.current) return;
     setActiveAttempt((current) => {
       if (!current) return current;
-      return {
+      const nextAttempt = {
         ...current,
         currentQueueIndex: Math.max(0, current.currentQueueIndex - 1),
       };
+      persistActiveAttempt(nextAttempt);
+      return nextAttempt;
     });
     setFinishWarning("");
   };
@@ -363,16 +389,18 @@ export function TestSection({
     if (completionInFlightRef.current) return;
     setActiveAttempt((current) => {
       if (!current) return current;
-      return {
+      const nextAttempt = {
         ...current,
         currentQueueIndex: Math.min(current.queue.length - 1, current.currentQueueIndex + 1),
       };
+      persistActiveAttempt(nextAttempt);
+      return nextAttempt;
     });
     setFinishWarning("");
   };
 
   const activeDefinition = activeAttempt
-    ? definitions.find((item) => item.id === activeAttempt.testId) || null
+    ? definitions.find((item) => item.id === activeAttempt.testId) || recoveredDefinition
     : null;
   const finishSummary = activeAttempt ? getFinishSummary(activeAttempt) : null;
 
@@ -386,7 +414,20 @@ export function TestSection({
     setDifficultyTarget(null);
     setResultAttempt({ result, definition: activeDefinition, reason });
     onCompletedAttempt(result, activeAttempt.queue, activeAttempt.submittedAnswers);
+    onClearActiveRecovery();
     setActiveAttempt(null);
+  };
+
+  const continueRecoveredTest = () => {
+    if (!pendingActiveRecovery) return;
+    setRecoveredDefinition(pendingActiveRecovery.testDefinition);
+    completionInFlightRef.current = false;
+    setFinishWarning("");
+    setFinishConfirmOpen(false);
+    setResultAttempt(null);
+    setDifficultyModalOpen(false);
+    setDifficultyTarget(null);
+    setActiveAttempt(pendingActiveRecovery.activeAttempt);
   };
 
   const getQuestionDifficulty = (questionId: string) => {
@@ -451,9 +492,28 @@ export function TestSection({
     completeActiveTest("timeout");
   }, [activeAttempt, activeDefinition, nowMs]);
 
+  const recoveryModal =
+    (pendingActiveRecovery || activeRecoveryLoadError) && !activeAttempt && !resultAttempt ? (
+      <div className="settings-modal-backdrop" role="presentation">
+        <div className="settings-modal finish-confirm-modal" role="dialog" aria-modal="true">
+          <h3>{t("test.recoveryTitle")}</h3>
+          <p>{activeRecoveryLoadError ? t("test.recoveryCorruptBody") : t("test.recoveryBody")}</p>
+          <div className="settings-modal-actions">
+            <button type="button" className="btn btn-danger" onClick={onDiscardActiveRecovery}>
+              {t("test.exitTest")}
+            </button>
+            {pendingActiveRecovery ? (
+              <Button onClick={continueRecoveredTest}>{t("test.continueTest")}</Button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    ) : null;
+
   if (!collection) {
     return (
       <div className="test-empty-state-wrap">
+        {recoveryModal}
         <Card
           title={t("test.emptyQuestionBankTitle")}
           subtitle={t("test.emptyQuestionBankSubtitle")}
@@ -786,6 +846,7 @@ export function TestSection({
 
   return (
     <div className="view-grid test-home-grid">
+      {recoveryModal}
       <div className="test-home-content">
         <div className="configure-cta-wrap">
           <button type="button" className="configure-cta" onClick={openCreate}>

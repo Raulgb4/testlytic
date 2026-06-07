@@ -201,7 +201,12 @@
     "emptyQuestionBankTitle": "Importa preguntas primero.",
     "emptyQuestionBankSubtitle": "Los tests se crean desde tu Banco de preguntas local.",
     "emptyQuestionBankBody": "Descarga la plantilla JSON o importa un banco de preguntas existente desde la sección Banco de preguntas antes de configurar un test.",
-    "goToQuestionBank": "Ir al Banco de preguntas"
+    "goToQuestionBank": "Ir al Banco de preguntas",
+    "recoveryTitle": "Se encontró un test sin finalizar",
+    "recoveryBody": "Tienes un test en curso. Continúa donde lo dejaste o sal y descártalo.",
+    "recoveryCorruptBody": "No se pudo restaurar el test sin finalizar guardado. Sal para descartarlo y seguir usando Testlytic.",
+    "continueTest": "Continuar test",
+    "exitTest": "Salir del test"
   },
   "questionBank": {
     "summaryTitle": "Resumen del Banco de preguntas",

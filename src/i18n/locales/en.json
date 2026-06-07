@@ -201,7 +201,12 @@
     "emptyQuestionBankTitle": "Import questions first.",
     "emptyQuestionBankSubtitle": "Tests are created from your local Question Bank.",
     "emptyQuestionBankBody": "Download the JSON template or import an existing question bank from the Question Bank section before configuring a test.",
-    "goToQuestionBank": "Go to Question Bank"
+    "goToQuestionBank": "Go to Question Bank",
+    "recoveryTitle": "Unfinished test found",
+    "recoveryBody": "You have a test in progress. Continue where you left off or exit and discard it.",
+    "recoveryCorruptBody": "The saved unfinished test could not be restored. Exit to discard it and continue using Testlytic.",
+    "continueTest": "Continue Test",
+    "exitTest": "Exit Test"
   },
   "questionBank": {
     "summaryTitle": "Question Bank Summary",

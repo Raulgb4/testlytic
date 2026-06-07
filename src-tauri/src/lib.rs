@@ -176,6 +176,16 @@ struct SaveCompletedAttemptRequest {
     answers: Vec<AttemptAnswerSnapshotDto>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ActiveTestRecoveryDto {
+    id: String,
+    test_definition: serde_json::Value,
+    active_attempt: serde_json::Value,
+    saved_at: String,
+    app_version: Option<String>,
+}
+
 fn now_iso() -> String {
     chrono::Utc::now().to_rfc3339()
 }
@@ -293,6 +303,14 @@ fn initialize_db(conn: &Connection) -> rusqlite::Result<()> {
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL,
           updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS active_test_attempts (
+          id TEXT PRIMARY KEY,
+          test_definition_snapshot TEXT NOT NULL,
+          active_attempt_snapshot TEXT NOT NULL,
+          saved_at TEXT NOT NULL,
+          app_version TEXT
         );
 
         CREATE INDEX IF NOT EXISTS idx_questions_fingerprint ON questions(content_fingerprint);
@@ -727,6 +745,7 @@ fn delete_all_completed_attempts(state: State<'_, DbState>) -> CommandResult<()>
 fn reset_question_bank(state: State<'_, DbState>) -> CommandResult<()> {
     let conn = state.conn.lock().map_err(|error| error.to_string())?;
     conn.execute("DELETE FROM questions", []).map_err(|error| error.to_string())?;
+    conn.execute("DELETE FROM active_test_attempts", []).map_err(|error| error.to_string())?;
     Ok(())
 }
 
@@ -734,6 +753,67 @@ fn reset_question_bank(state: State<'_, DbState>) -> CommandResult<()> {
 fn update_question_difficulty(state: State<'_, DbState>, question_id: String, difficulty: String) -> CommandResult<()> {
     let conn = state.conn.lock().map_err(|error| error.to_string())?;
     conn.execute("UPDATE questions SET user_declared_difficulty = ?, updated_at = ? WHERE id = ?", params![difficulty, now_iso(), question_id]).map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn get_active_test_attempt(state: State<'_, DbState>) -> CommandResult<Option<ActiveTestRecoveryDto>> {
+    let conn = state.conn.lock().map_err(|error| error.to_string())?;
+    let row = conn
+        .query_row(
+            "SELECT id, test_definition_snapshot, active_attempt_snapshot, saved_at, app_version FROM active_test_attempts ORDER BY saved_at DESC LIMIT 1",
+            [],
+            |row| {
+                let test_definition_json: String = row.get(1)?;
+                let active_attempt_json: String = row.get(2)?;
+                let test_definition = serde_json::from_str(&test_definition_json).map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        1,
+                        rusqlite::types::Type::Text,
+                        Box::new(error),
+                    )
+                })?;
+                let active_attempt = serde_json::from_str(&active_attempt_json).map_err(|error| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        2,
+                        rusqlite::types::Type::Text,
+                        Box::new(error),
+                    )
+                })?;
+                Ok(ActiveTestRecoveryDto {
+                    id: row.get(0)?,
+                    test_definition,
+                    active_attempt,
+                    saved_at: row.get(3)?,
+                    app_version: row.get(4)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|error| error.to_string())?;
+    Ok(row)
+}
+
+#[tauri::command]
+fn save_active_test_attempt(state: State<'_, DbState>, recovery: ActiveTestRecoveryDto) -> CommandResult<()> {
+    let conn = state.conn.lock().map_err(|error| error.to_string())?;
+    let test_definition_snapshot = serde_json::to_string(&recovery.test_definition).map_err(|error| error.to_string())?;
+    let active_attempt_snapshot = serde_json::to_string(&recovery.active_attempt).map_err(|error| error.to_string())?;
+    conn.execute("DELETE FROM active_test_attempts", [])
+        .map_err(|error| error.to_string())?;
+    conn.execute(
+        "INSERT INTO active_test_attempts(id, test_definition_snapshot, active_attempt_snapshot, saved_at, app_version) VALUES (?, ?, ?, ?, ?)",
+        params![recovery.id, test_definition_snapshot, active_attempt_snapshot, recovery.saved_at, recovery.app_version],
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn clear_active_test_attempt(state: State<'_, DbState>) -> CommandResult<()> {
+    let conn = state.conn.lock().map_err(|error| error.to_string())?;
+    conn.execute("DELETE FROM active_test_attempts", [])
+        .map_err(|error| error.to_string())?;
     Ok(())
 }
 
@@ -766,7 +846,10 @@ pub fn run() {
             list_completed_attempts,
             delete_all_completed_attempts,
             reset_question_bank,
-            update_question_difficulty
+            update_question_difficulty,
+            get_active_test_attempt,
+            save_active_test_attempt,
+            clear_active_test_attempt
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

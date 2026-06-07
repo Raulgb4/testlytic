@@ -15,10 +15,12 @@ import {
 import { TestSection } from "../features/test/TestSection";
 import {
   CompletedTestAttempt,
+  ActiveTestAttempt,
   RuntimeAnswer,
   RuntimeQueueItem,
   TestDefinition,
 } from "../features/test/testTypes";
+import { ActiveTestRecovery } from "../services/persistence";
 import { Language } from "../i18n";
 import { NavItem } from "../shared/components/NavItem";
 import { NAV_ITEMS, SectionId } from "./navigation";
@@ -39,6 +41,11 @@ export function AppShell({
   onSaveDefinition,
   onDeleteDefinition,
   onGenerateQuestions,
+  pendingActiveRecovery,
+  activeRecoveryLoadError,
+  onSaveActiveRecovery,
+  onClearActiveRecovery,
+  onDiscardActiveRecovery,
   validationErrors,
   pendingImportConflict,
   onImportCollectionFile,
@@ -63,6 +70,11 @@ export function AppShell({
   onSaveDefinition: (definition: TestDefinition) => void;
   onDeleteDefinition: (definition: TestDefinition) => void;
   onGenerateQuestions: (definition: TestDefinition) => Promise<QuestionCollection["questions"]>;
+  pendingActiveRecovery: ActiveTestRecovery | null;
+  activeRecoveryLoadError: boolean;
+  onSaveActiveRecovery: (definition: TestDefinition, activeAttempt: ActiveTestAttempt) => void;
+  onClearActiveRecovery: () => void;
+  onDiscardActiveRecovery: () => void;
   validationErrors: ValidationIssue[];
   pendingImportConflict: PendingImportConflict | null;
   onImportCollectionFile: (file: File, merge?: boolean) => Promise<ImportCollectionResult>;
@@ -132,6 +144,11 @@ export function AppShell({
               onSaveDefinition={onSaveDefinition}
               onDeleteDefinition={onDeleteDefinition}
               onGenerateQuestions={onGenerateQuestions}
+              pendingActiveRecovery={pendingActiveRecovery}
+              activeRecoveryLoadError={activeRecoveryLoadError}
+              onSaveActiveRecovery={onSaveActiveRecovery}
+              onClearActiveRecovery={onClearActiveRecovery}
+              onDiscardActiveRecovery={onDiscardActiveRecovery}
               onCompletedAttempt={onAddCompletedAttempt}
               onUpdateQuestionDifficulty={onUpdateQuestionDifficulty}
               onGoToQuestionBank={() => setSection("questionBank")}

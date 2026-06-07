@@ -15,6 +15,7 @@ import {
 import { validateQuestionCollectionJson } from "./features/test/questionCollectionValidation";
 import {
   CompletedTestAttempt,
+  ActiveTestAttempt,
   RuntimeAnswer,
   RuntimeQueueItem,
   TestDefinition,
@@ -24,6 +25,7 @@ import {
   deleteAllCompletedAttempts,
   deleteTestDefinition,
   generateTestQuestions,
+  getActiveTestAttempt,
   getPreferences,
   getQuestionCollection,
   importQuestionCollection,
@@ -31,9 +33,12 @@ import {
   listTestDefinitions,
   resetQuestionBank,
   saveCompletedAttempt,
+  saveActiveTestAttempt,
   saveTestDefinition,
   setPreference,
   updateQuestionDifficulty as persistQuestionDifficulty,
+  clearActiveTestAttempt,
+  ActiveTestRecovery,
 } from "./services/persistence";
 
 type ThemeMode = "dark" | "light";
@@ -46,6 +51,10 @@ function App() {
   const [collection, setCollection] = useState<QuestionCollection | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationIssue[]>([]);
   const [definitions, setDefinitions] = useState<TestDefinition[]>([]);
+  const [pendingActiveRecovery, setPendingActiveRecovery] = useState<ActiveTestRecovery | null>(
+    null,
+  );
+  const [activeRecoveryLoadError, setActiveRecoveryLoadError] = useState(false);
   const [pendingImportConflict, setPendingImportConflict] = useState<PendingImportConflict | null>(
     null,
   );
@@ -57,13 +66,22 @@ function App() {
 
     async function hydrate() {
       try {
-        const [preferences, persistedCollection, persistedDefinitions, persistedAttempts] =
-          await Promise.all([
-            getPreferences(),
-            getQuestionCollection(),
-            listTestDefinitions(),
-            listCompletedAttempts(),
-          ]);
+        const [
+          preferences,
+          persistedCollection,
+          persistedDefinitions,
+          persistedAttempts,
+          persistedActiveRecovery,
+        ] = await Promise.all([
+          getPreferences(),
+          getQuestionCollection(),
+          listTestDefinitions(),
+          listCompletedAttempts(),
+          getActiveTestAttempt().catch((error) => {
+            console.error("Failed to load active test recovery", error);
+            return "corrupt" as const;
+          }),
+        ]);
 
         if (cancelled) return;
         setLanguage(preferences.language);
@@ -71,6 +89,11 @@ function App() {
         setCollection(persistedCollection);
         setDefinitions(persistedDefinitions);
         setCompletedAttempts(persistedAttempts);
+        if (persistedActiveRecovery === "corrupt") {
+          setActiveRecoveryLoadError(true);
+        } else {
+          setPendingActiveRecovery(persistedActiveRecovery);
+        }
       } catch (error) {
         console.error("Failed to hydrate persisted state", error);
       }
@@ -192,6 +215,22 @@ function App() {
     setCompletedAttempts((current) => [attempt, ...current]);
   };
 
+  const persistActiveRecovery = (definition: TestDefinition, activeAttempt: ActiveTestAttempt) => {
+    void saveActiveTestAttempt({
+      id: activeAttempt.id,
+      testDefinition: definition,
+      activeAttempt,
+      savedAt: new Date().toISOString(),
+      appVersion: "0.1.0",
+    });
+  };
+
+  const discardActiveRecovery = () => {
+    void clearActiveTestAttempt();
+    setPendingActiveRecovery(null);
+    setActiveRecoveryLoadError(false);
+  };
+
   return (
     <AppShell
       t={t}
@@ -206,6 +245,15 @@ function App() {
       onSaveDefinition={(definition) => void saveDefinition(definition)}
       onDeleteDefinition={(definition) => void removeDefinition(definition)}
       onGenerateQuestions={(definition) => generateTestQuestions(definition)}
+      pendingActiveRecovery={pendingActiveRecovery}
+      activeRecoveryLoadError={activeRecoveryLoadError}
+      onSaveActiveRecovery={persistActiveRecovery}
+      onClearActiveRecovery={() => {
+        void clearActiveTestAttempt();
+        setPendingActiveRecovery(null);
+        setActiveRecoveryLoadError(false);
+      }}
+      onDiscardActiveRecovery={discardActiveRecovery}
       validationErrors={validationErrors}
       pendingImportConflict={pendingImportConflict}
       onImportCollectionFile={importCollectionFile}
@@ -214,6 +262,9 @@ function App() {
       onCancelImportConflict={cancelImportConflict}
       onResetQuestionBank={() => {
         void resetQuestionBank();
+        void clearActiveTestAttempt();
+        setPendingActiveRecovery(null);
+        setActiveRecoveryLoadError(false);
         setCollection(null);
         setValidationErrors([]);
         setPendingImportConflict(null);
