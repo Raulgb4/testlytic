@@ -209,12 +209,12 @@
 
 .question-table th:nth-child(1),
 .question-table td:nth-child(1) {
-  width: 17%;
+  width: 52%;
 }
 
 .question-table th:nth-child(2),
 .question-table td:nth-child(2) {
-  width: 36%;
+  width: 10%;
 }
 
 .question-table th:nth-child(3),
@@ -229,7 +229,7 @@
 
 .question-table th:nth-child(5),
 .question-table td:nth-child(5) {
-  width: 12%;
+  width: 10%;
 }
 
 .question-table td:not(.question-table-question),
