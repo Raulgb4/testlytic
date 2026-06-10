@@ -5,9 +5,7 @@ import { ExamPdfDocument } from "./ExamPdfDocument";
 import { buildExamPdfPayload } from "./examPdfPayload";
 import { buildPdfFileName } from "./pdfLayoutUtils";
 
-export type ExamPdfSaveResult =
-  | FileSaveResult
-  | { status: "renderError"; error: string };
+export type ExamPdfSaveResult = FileSaveResult | { status: "renderError"; error: string };
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
