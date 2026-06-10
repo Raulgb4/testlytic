@@ -62,6 +62,7 @@ struct CollectionQuestionDto {
     question_type: String,
     options: Vec<QuestionOptionDto>,
     correct_options: Vec<String>,
+    shuffle_options: bool,
     correct_answer_explanation: Option<String>,
     question_category: String,
     question_subcategory: Option<String>,
@@ -97,6 +98,7 @@ struct ImportedQuestionDto {
     question_type: String,
     options: Vec<QuestionOptionDto>,
     correct_options: Vec<String>,
+    shuffle_options: bool,
     correct_answer_explanation: Option<String>,
     question_category: String,
     question_subcategory: Option<String>,
@@ -239,6 +241,7 @@ fn initialize_db(conn: &Connection) -> rusqlite::Result<()> {
           question TEXT NOT NULL,
           auxiliary_information TEXT,
           question_type TEXT NOT NULL,
+          shuffle_options INTEGER NOT NULL DEFAULT 1,
           correct_answer_explanation TEXT,
           question_category TEXT NOT NULL,
           question_subcategory TEXT,
@@ -460,6 +463,26 @@ fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
         )?;
     }
 
+    let shuffle_migration_applied = has_migration(conn, 3)?;
+    let changed_shuffle_schema = add_column_if_missing(
+        conn,
+        "questions",
+        "shuffle_options",
+        "shuffle_options INTEGER NOT NULL DEFAULT 1",
+    )?;
+
+    if !shuffle_migration_applied && !changed_shuffle_schema {
+        conn.execute(
+            "INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, datetime('now'))",
+            params![3, "question_shuffle_options"],
+        )?;
+    } else if !shuffle_migration_applied {
+        conn.execute(
+            "INSERT INTO schema_migrations(version, name, applied_at) VALUES (?, ?, datetime('now'))",
+            params![3, "question_shuffle_options"],
+        )?;
+    }
+
     Ok(())
 }
 
@@ -563,6 +586,7 @@ fn fingerprint_question(question: &CollectionQuestionDto) -> String {
         "questionType": question.question_type,
         "options": options,
         "correctOptions": correct_options,
+        "shuffleOptions": question.shuffle_options,
         "correctAnswerExplanation": normalize(&question.correct_answer_explanation.clone().unwrap_or_default()),
         "questionCategory": normalize(&question.question_category),
         "questionSubcategory": normalize(&question.question_subcategory.clone().unwrap_or_default()),
@@ -610,16 +634,17 @@ fn question_from_row(
         question_type: row.get(3)?,
         options,
         correct_options,
-        correct_answer_explanation: row.get(4)?,
-        question_category: row.get(5)?,
-        question_subcategory: row.get(6)?,
-        question_source: row.get(7)?,
+        shuffle_options: row.get::<_, i64>(4)? != 0,
+        correct_answer_explanation: row.get(5)?,
+        question_category: row.get(6)?,
+        question_subcategory: row.get(7)?,
+        question_source: row.get(8)?,
         analytics: QuestionAnalyticsDto {
-            computed_difficulty: row.get(8)?,
-            user_declared_difficulty: row.get(9)?,
-            times_answered_incorrectly: row.get(10)?,
-            times_answered_correctly: row.get(11)?,
-            exposure_count: row.get(12)?,
+            computed_difficulty: row.get(9)?,
+            user_declared_difficulty: row.get(10)?,
+            times_answered_incorrectly: row.get(11)?,
+            times_answered_correctly: row.get(12)?,
+            exposure_count: row.get(13)?,
         },
     })
 }
@@ -700,7 +725,7 @@ fn is_option_correct(
 
 fn load_all_questions(conn: &Connection) -> rusqlite::Result<Vec<CollectionQuestionDto>> {
     let mut stmt = conn.prepare(
-        "SELECT id, question, auxiliary_information, question_type, correct_answer_explanation,
+        "SELECT id, question, auxiliary_information, question_type, shuffle_options, correct_answer_explanation,
                 question_category, question_subcategory, question_source, computed_difficulty,
                 user_declared_difficulty, times_answered_incorrectly, times_answered_correctly,
                 exposure_count
@@ -719,7 +744,7 @@ fn load_eligible_questions(
     }
 
     let mut query = String::from(
-        "SELECT id, question, auxiliary_information, question_type, correct_answer_explanation,
+        "SELECT id, question, auxiliary_information, question_type, shuffle_options, correct_answer_explanation,
                 question_category, question_subcategory, question_source, computed_difficulty,
                 user_declared_difficulty, times_answered_incorrectly, times_answered_correctly,
                 exposure_count, original_answer_count, original_correct_count, original_incorrect_count,
@@ -745,13 +770,13 @@ fn load_eligible_questions(
     let rows = stmt.query_map(params_from_iter(values.iter()), |row| {
         let question = question_from_row(conn, row)?;
         let stats = QuestionSelectionStats {
-            exposure_count: row.get(12)?,
-            original_answer_count: row.get(13)?,
-            original_correct_count: row.get(14)?,
-            original_incorrect_count: row.get(15)?,
-            last_seen_at: row.get(16)?,
-            last_correct_at: row.get(17)?,
-            last_incorrect_at: row.get(18)?,
+            exposure_count: row.get(13)?,
+            original_answer_count: row.get(14)?,
+            original_correct_count: row.get(15)?,
+            original_incorrect_count: row.get(16)?,
+            last_seen_at: row.get(17)?,
+            last_correct_at: row.get(18)?,
+            last_incorrect_at: row.get(19)?,
         };
         Ok(ScoredQuestion {
             question,
@@ -1003,17 +1028,18 @@ fn insert_question(
         });
     conn.execute(
         "INSERT OR REPLACE INTO questions(id, content_fingerprint, question, auxiliary_information, question_type,
-         correct_answer_explanation, question_category, question_subcategory, question_source, computed_difficulty,
+         shuffle_options, correct_answer_explanation, question_category, question_subcategory, question_source, computed_difficulty,
          user_declared_difficulty, times_answered_incorrectly, times_answered_correctly, exposure_count,
          original_answer_count, original_correct_count, original_incorrect_count, last_seen_at, last_correct_at,
          last_incorrect_at, imported_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         params![
             id,
             fingerprint,
             question.question,
             question.auxiliary_information,
             question.question_type,
+            question.shuffle_options as i64,
             question.correct_answer_explanation,
             question.question_category,
             question.question_subcategory,
@@ -1181,6 +1207,7 @@ fn export_question_bank(state: State<'_, DbState>) -> CommandResult<ImportedQues
                 question_type: question.question_type,
                 options: question.options,
                 correct_options: question.correct_options,
+                shuffle_options: question.shuffle_options,
                 correct_answer_explanation: question.correct_answer_explanation,
                 question_category: question.question_category,
                 question_subcategory: question.question_subcategory,
@@ -1462,6 +1489,7 @@ mod tests {
                 text: "A".into(),
             }],
             correct_options: vec!["a".into()],
+            shuffle_options: true,
             correct_answer_explanation: None,
             question_category: "Category".into(),
             question_subcategory: None,
@@ -1677,6 +1705,12 @@ mod tests {
 
         let stats = load_question_selection_stats(&conn, "q1").unwrap().unwrap();
         let migration_exists = has_migration(&conn, 2).unwrap();
+        let shuffle_migration_exists = has_migration(&conn, 3).unwrap();
+        let shuffle_options: i64 = conn
+            .query_row("SELECT shuffle_options FROM questions WHERE id = 'q1'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
         let index_exists: bool = conn
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_questions_exposure_recency')",
@@ -1687,12 +1721,28 @@ mod tests {
             .unwrap();
 
         assert!(migration_exists);
+        assert!(shuffle_migration_exists);
         assert!(index_exists);
+        assert_eq!(shuffle_options, 1);
         assert_eq!(stats.exposure_count, 1);
         assert_eq!(stats.original_answer_count, 1);
         assert_eq!(stats.original_correct_count, 1);
         assert_eq!(stats.original_incorrect_count, 0);
         assert_eq!(stats.last_seen_at.as_deref(), Some("2026-01-01T00:05:00Z"));
+    }
+
+    #[test]
+    fn insert_and_load_question_preserves_shuffle_options_false() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        let mut question = test_question("fixed-order", "unrated");
+        question.shuffle_options = false;
+
+        insert_question(&conn, &question, None).unwrap();
+        let loaded = load_all_questions(&conn).unwrap();
+
+        assert_eq!(loaded.len(), 1);
+        assert!(!loaded[0].shuffle_options);
     }
 }
 

@@ -12,6 +12,7 @@ export type RuntimeQuestion = {
   questionSubcategory?: string;
   options: QuestionOption[];
   correctOptions: string[];
+  shuffleOptions?: boolean;
   correctAnswerExplanation?: string;
 };
 

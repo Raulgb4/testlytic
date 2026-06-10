@@ -9,6 +9,7 @@ export type ImportedQuestion = {
   questionType: "single_choice" | "multiple_choice";
   options: { id: string; text: string }[];
   correctOptions: string[];
+  shuffleOptions?: boolean;
   correctAnswerExplanation?: string;
   questionCategory: string;
   questionSubcategory?: string;
@@ -32,6 +33,7 @@ export type CollectionQuestion = {
   questionType: "single_choice" | "multiple_choice";
   options: { id: string; text: string }[];
   correctOptions: string[];
+  shuffleOptions: boolean;
   correctAnswerExplanation?: string;
   questionCategory: string;
   questionSubcategory?: string;

@@ -14,6 +14,7 @@ function toExportQuestion(question: QuestionCollection["questions"][number]): Im
     questionType: question.questionType,
     options: question.options.map((option) => ({ id: option.id, text: option.text })),
     correctOptions: [...question.correctOptions],
+    shuffleOptions: question.shuffleOptions,
     correctAnswerExplanation: question.correctAnswerExplanation,
     questionCategory: question.questionCategory,
     questionSubcategory: question.questionSubcategory,

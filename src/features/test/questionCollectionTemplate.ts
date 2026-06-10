@@ -17,6 +17,7 @@ export const QUESTION_COLLECTION_TEMPLATE: ImportedQuestionCollection = {
         { id: "c", text: "Most recent topic attempted" },
       ],
       correctOptions: ["b"],
+      shuffleOptions: true,
       correctAnswerExplanation: "Average score across completed tests is stable over time.",
       questionCategory: "Analytics",
       questionSubcategory: "Core Metrics",

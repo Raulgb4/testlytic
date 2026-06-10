@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildQuestionBankExportJson } from "./questionCollectionExport";
 import { QuestionCollection } from "./questionCollectionTypes";
 import { validateQuestionCollectionJson } from "./questionCollectionValidation";
+import { buildRuntimeOptions } from "./testUtils";
 
 describe("buildQuestionBankExportJson", () => {
   it("exports an import-compatible collection without runtime fields", () => {
@@ -27,6 +28,7 @@ describe("buildQuestionBankExportJson", () => {
             { id: "b", text: "Average score across completed tests" },
           ],
           correctOptions: ["b"],
+          shuffleOptions: false,
           correctAnswerExplanation: "Average score is stable over time.",
           questionCategory: "Analytics",
           questionSubcategory: "Core Metrics",
@@ -57,6 +59,7 @@ describe("buildQuestionBankExportJson", () => {
             { id: "b", text: "Average score across completed tests" },
           ],
           correctOptions: ["b"],
+          shuffleOptions: false,
           correctAnswerExplanation: "Average score is stable over time.",
           questionCategory: "Analytics",
           questionSubcategory: "Core Metrics",
@@ -98,9 +101,97 @@ describe("buildQuestionBankExportJson", () => {
     if (!firstValidation.ok || !secondValidation.ok) return;
 
     expect(firstValidation.collection.questions[0].id).toBeTruthy();
+    expect(firstValidation.collection.questions[0].shuffleOptions).toBe(true);
     expect(firstValidation.collection.questions[0].id).toBe(
       secondValidation.collection.questions[0].id,
     );
+  });
+
+  it("validates explicit shuffleOptions true and false values", () => {
+    const buildJson = (shuffleOptions: boolean) =>
+      JSON.stringify({
+        version: "1",
+        questions: [
+          {
+            question: "Should options be shuffled?",
+            questionType: "single_choice",
+            options: [
+              { id: "a", text: "Yes" },
+              { id: "b", text: "No" },
+            ],
+            correctOptions: ["a"],
+            shuffleOptions,
+            questionCategory: "Behavior",
+          },
+        ],
+      });
+
+    const shuffled = validateQuestionCollectionJson(buildJson(true));
+    const fixed = validateQuestionCollectionJson(buildJson(false));
+
+    expect(shuffled.ok).toBe(true);
+    expect(fixed.ok).toBe(true);
+    if (!shuffled.ok || !fixed.ok) return;
+
+    expect(shuffled.collection.questions[0].shuffleOptions).toBe(true);
+    expect(fixed.collection.questions[0].shuffleOptions).toBe(false);
+  });
+
+  it("rejects non-boolean shuffleOptions values", () => {
+    const buildJson = (shuffleOptions: unknown) =>
+      JSON.stringify({
+        version: "1",
+        questions: [
+          {
+            question: "Invalid shuffle setting?",
+            questionType: "single_choice",
+            options: [
+              { id: "a", text: "A" },
+              { id: "b", text: "B" },
+            ],
+            correctOptions: ["a"],
+            shuffleOptions,
+            questionCategory: "Behavior",
+          },
+        ],
+      });
+
+    for (const value of ["false", 0]) {
+      const validation = validateQuestionCollectionJson(buildJson(value));
+      expect(validation.ok).toBe(false);
+      if (validation.ok) continue;
+      expect(validation.errors).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: "shuffleOptions.type" })]),
+      );
+    }
+  });
+
+  it("preserves option order at runtime when shuffleOptions is false", () => {
+    const options = [
+      { id: "a", text: "A" },
+      { id: "b", text: "B" },
+      { id: "c", text: "Both a and b" },
+    ];
+
+    const runtimeOptions = buildRuntimeOptions({
+      id: "q-fixed",
+      question: "Which answer references previous options?",
+      questionType: "single_choice",
+      options,
+      correctOptions: ["c"],
+      shuffleOptions: false,
+      questionCategory: "Behavior",
+      analytics: {
+        computedDifficulty: "unrated",
+        userDeclaredDifficulty: "unrated",
+        timesAnsweredIncorrectly: 0,
+        timesAnsweredCorrectly: 0,
+        exposureCount: 0,
+      },
+    });
+
+    expect(runtimeOptions).toEqual(options);
+    expect(runtimeOptions).not.toBe(options);
   });
 
   it("accepts legacy question IDs but ignores them when generating internal IDs", () => {

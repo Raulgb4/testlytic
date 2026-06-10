@@ -102,6 +102,7 @@ export function buildQuestionContentFingerprint(
     | "questionType"
     | "options"
     | "correctOptions"
+    | "shuffleOptions"
     | "correctAnswerExplanation"
     | "questionCategory"
     | "questionSubcategory"
@@ -118,6 +119,7 @@ export function buildQuestionContentFingerprint(
         text: normalizeFingerprintString(option.text),
       })),
       correctOptions: [...question.correctOptions].map(normalizeFingerprintString).sort(),
+      shuffleOptions: question.shuffleOptions !== false,
       correctAnswerExplanation: normalizeFingerprintString(question.correctAnswerExplanation),
       questionCategory: normalizeFingerprintString(question.questionCategory),
       questionSubcategory: normalizeFingerprintString(question.questionSubcategory),
@@ -303,6 +305,16 @@ export function validateQuestionCollectionJson(
     const optionalExplanation = optionalString(question.correctAnswerExplanation);
     const optionalSubcategory = optionalString(question.questionSubcategory);
     const optionalSource = optionalString(question.questionSource);
+    let shuffleOptions = true;
+    if (question.shuffleOptions !== undefined && typeof question.shuffleOptions !== "boolean") {
+      addQuestionError({
+        path: `${path}.shuffleOptions`,
+        code: "shuffleOptions.type",
+        message: "Shuffle Options must be a boolean when provided.",
+      });
+    } else if (typeof question.shuffleOptions === "boolean") {
+      shuffleOptions = question.shuffleOptions;
+    }
 
     if (optionalAux === null) {
       addQuestionError({
@@ -488,6 +500,7 @@ export function validateQuestionCollectionJson(
         questionType: type,
         options: normalizedOptions,
         correctOptions: normalizedCorrectOptions,
+        shuffleOptions,
         correctAnswerExplanation: optionalExplanation || undefined,
         questionCategory: category,
         questionSubcategory: optionalSubcategory || undefined,
@@ -501,6 +514,7 @@ export function validateQuestionCollectionJson(
         questionType: type,
         options: normalizedOptions,
         correctOptions: normalizedCorrectOptions,
+        shuffleOptions,
         correctAnswerExplanation: optionalExplanation || undefined,
         questionCategory: category,
         questionSubcategory: optionalSubcategory || undefined,

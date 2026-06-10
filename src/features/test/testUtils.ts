@@ -42,6 +42,10 @@ export function getMatchingQuestions(
   });
 }
 
+export function buildRuntimeOptions(question: CollectionQuestion) {
+  return question.shuffleOptions !== false ? shuffleArray(question.options) : [...question.options];
+}
+
 export function buildRuntimeQuestions(
   _definition: TestDefinition,
   selectedQuestions: CollectionQuestion[],
@@ -53,8 +57,9 @@ export function buildRuntimeQuestions(
     questionType: question.questionType,
     questionCategory: question.questionCategory,
     questionSubcategory: question.questionSubcategory,
-    options: shuffleArray(question.options),
+    options: buildRuntimeOptions(question),
     correctOptions: question.correctOptions,
+    shuffleOptions: question.shuffleOptions,
     correctAnswerExplanation: question.correctAnswerExplanation,
   }));
 }

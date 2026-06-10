@@ -102,6 +102,7 @@ export async function saveCompletedAttempt(
       retryNumber: queueItem.retryNumber,
       question: {
         ...queueItem.question,
+        shuffleOptions: queueItem.question.shuffleOptions ?? true,
         analytics: {
           computedDifficulty: "unrated",
           userDeclaredDifficulty: "unrated",
