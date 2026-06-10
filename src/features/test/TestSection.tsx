@@ -9,6 +9,7 @@ import {
   ActiveTestAttempt,
   CompletedTestAttempt,
   RuntimeAnswer,
+  RuntimeQuestion,
   RuntimeQueueItem,
   TestAttempt,
   TestDefinition,
@@ -99,6 +100,7 @@ export function TestSection({
     null,
   );
   const [formOpen, setFormOpen] = useState(false);
+  const [exportingPdfTestId, setExportingPdfTestId] = useState<string | null>(null);
   const [formState, setFormState] = useState<TestFormState>(INITIAL_FORM);
   const [editingTestId, setEditingTestId] = useState<string | null>(null);
   const [formTouched, setFormTouched] = useState(false);
@@ -299,6 +301,57 @@ export function TestSection({
     setRecoveryBaseTimestamp(Date.now());
     setActiveAttempt(nextAttempt);
     onSaveActiveRecovery(definition, nextAttempt);
+  };
+
+  const exportPdfDefinition = async (definition: TestDefinition) => {
+    if (exportingPdfTestId) return;
+    setExportingPdfTestId(definition.id);
+    try {
+      let generatedQuestions: QuestionCollection["questions"];
+      try {
+        generatedQuestions = await onGenerateQuestions(definition);
+      } catch (error) {
+        console.error("Failed to generate PDF questions", error);
+        setToast({ message: t("test.pdfExportQuestionsError"), variant: "error" });
+        return;
+      }
+
+      let runtimeQuestions: RuntimeQuestion[];
+      try {
+        runtimeQuestions = buildRuntimeQuestions(definition, generatedQuestions);
+      } catch (error) {
+        console.error("Failed to build PDF runtime questions", error);
+        setToast({ message: t("test.pdfExportQuestionsError"), variant: "error" });
+        return;
+      }
+
+      if (runtimeQuestions.length === 0) {
+        setToast({ message: t("test.noMatchingQuestions"), variant: "error" });
+        return;
+      }
+
+      const { saveExamPdf } = await import("./pdf/examPdfExport");
+      const result = await saveExamPdf({
+        definition,
+        runtimeQuestions,
+        generatedAt: new Date().toISOString(),
+      });
+
+      if (result.status === "saved") {
+        setToast({ message: t("test.pdfExportSavedSuccess"), variant: "success" });
+      }
+      if (result.status === "renderError") {
+        setToast({ message: t("test.pdfExportRenderError"), variant: "error" });
+      }
+      if (result.status === "dialogError" || result.status === "writeError") {
+        setToast({ message: t("test.pdfExportWriteError"), variant: "error" });
+      }
+    } catch (error) {
+      console.error("Failed to export PDF", error);
+      setToast({ message: t("test.pdfExportSavedError"), variant: "error" });
+    } finally {
+      setExportingPdfTestId(null);
+    }
   };
 
   const persistActiveAttempt = (nextAttempt: ActiveTestAttempt) => {
@@ -942,6 +995,15 @@ export function TestSection({
                     <div className="saved-test-actions">
                       <Button onClick={() => void runDefinition(definition)}>
                         {t("test.run")}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={Boolean(exportingPdfTestId)}
+                        onClick={() => void exportPdfDefinition(definition)}
+                      >
+                        {exportingPdfTestId === definition.id
+                          ? t("test.exportingPdf")
+                          : t("test.exportPdf")}
                       </Button>
                       <Button variant="secondary" onClick={() => openEdit(definition)}>
                         {t("test.edit")}
