@@ -316,6 +316,18 @@
   margin-top: -2px;
 }
 
+.finish-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.finish-confirm-actions .btn {
+  min-width: 0;
+}
+
 .test-runner-full {
   width: 100%;
   max-width: none;

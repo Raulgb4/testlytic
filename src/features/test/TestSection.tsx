@@ -768,7 +768,7 @@ export function TestSection({
                   {t("test.finishConfirmBlocked", { count: finishSummary.unanswered })}
                 </p>
               ) : null}
-              <div className="settings-modal-actions">
+              <div className="settings-modal-actions finish-confirm-actions">
                 <Button variant="secondary" onClick={() => setFinishConfirmOpen(false)}>
                   {t("test.cancel")}
                 </Button>
