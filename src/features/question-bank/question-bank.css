@@ -121,6 +121,13 @@
   font-size: 0.88rem;
 }
 
+.collection-errors-summary {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .collection-errors-list {
   margin: 0;
   padding-left: 1.2rem;
@@ -134,6 +141,24 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 0.8rem;
+}
+
+.collection-import-status {
+  width: min(820px, 100%);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-soft) 24%, var(--surface));
+  color: var(--text);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.86rem;
+}
+
+.collection-import-warning {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .question-bank-view {

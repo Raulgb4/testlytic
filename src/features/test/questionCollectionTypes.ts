@@ -56,10 +56,19 @@ export type QuestionCollection = {
 };
 
 export type ValidationIssue = {
+  severity: "error" | "warning";
   path: string;
   message: string;
+  code: string;
+  questionIndex?: number;
+  optionIndex?: number;
 };
 
 export type ValidationResult =
-  | { ok: true; collection: QuestionCollection }
-  | { ok: false; errors: ValidationIssue[] };
+  | { ok: true; collection: QuestionCollection; warnings: ValidationIssue[] }
+  | {
+      ok: false;
+      errors: ValidationIssue[];
+      warnings: ValidationIssue[];
+      errorLimitReached: boolean;
+    };

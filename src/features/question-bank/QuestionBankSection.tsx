@@ -3,11 +3,17 @@ import { Translator } from "../../app/types";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
 import { Toast } from "../../shared/components/Toast";
-import { QuestionCollectionOnboarding } from "../test/QuestionCollectionOnboarding";
+import {
+  ImportErrors,
+  ImportStatus,
+  isImportBusy,
+  QuestionCollectionOnboarding,
+} from "../test/QuestionCollectionOnboarding";
 import {
   DuplicateQuestionPreview,
   ImportCollectionResult,
   ImportConflictResolution,
+  ImportProcessingState,
   PendingImportConflict,
 } from "../test/questionCollectionImport";
 import { QUESTION_BANK_EXPORT_FILE_NAME } from "../test/questionCollectionExport";
@@ -28,6 +34,7 @@ export function QuestionBankSection({
   t,
   collection,
   validationErrors,
+  importProcessing,
   pendingImportConflict,
   onImportFile,
   onClearValidationErrors,
@@ -37,6 +44,7 @@ export function QuestionBankSection({
   t: Translator;
   collection: QuestionCollection | null;
   validationErrors: ValidationIssue[];
+  importProcessing: ImportProcessingState;
   pendingImportConflict: PendingImportConflict | null;
   onImportFile: (file: File, merge?: boolean) => Promise<ImportCollectionResult>;
   onClearValidationErrors: () => void;
@@ -51,6 +59,7 @@ export function QuestionBankSection({
   const [toast, setToast] = useState<null | { message: string; variant: "success" | "error" }>(
     null,
   );
+  const importBusy = isImportBusy(importProcessing.stage);
 
   useEffect(() => {
     if (!toast) return;
@@ -123,6 +132,7 @@ export function QuestionBankSection({
         <QuestionCollectionOnboarding
           t={t}
           errors={validationErrors}
+          importProcessing={importProcessing}
           onDownloadTemplate={handleDownloadTemplate}
           onImportFile={(file) => void handleInitialImport(file)}
         />
@@ -172,7 +182,7 @@ export function QuestionBankSection({
           />
         </div>
         <div className="question-bank-summary-actions">
-          <Button variant="secondary" onClick={() => setImportMoreOpen(true)}>
+          <Button variant="secondary" onClick={() => setImportMoreOpen(true)} disabled={importBusy}>
             {t("test.importMoreQuestions")}
           </Button>
           <Button onClick={() => void handleExportQuestionBank()}>
@@ -190,16 +200,22 @@ export function QuestionBankSection({
             <p>{t("test.importMoreDescription")}</p>
 
             <div className="import-more-actions" aria-label={t("test.collectionActionsLabel")}>
-              <Button variant="secondary" onClick={() => void handleDownloadTemplate()}>
+              <Button
+                variant="secondary"
+                onClick={() => void handleDownloadTemplate()}
+                disabled={importBusy}
+              >
                 {t("test.downloadTemplate")}
               </Button>
-              <Button onClick={() => importMoreInputRef.current?.click()}>
+              <Button onClick={() => importMoreInputRef.current?.click()} disabled={importBusy}>
                 {t("test.importCollection")}
               </Button>
-              <Button variant="secondary" onClick={closeImportMore}>
+              <Button variant="secondary" onClick={closeImportMore} disabled={importBusy}>
                 {t("test.cancel")}
               </Button>
             </div>
+
+            <ImportStatus t={t} importProcessing={importProcessing} />
 
             <input
               id={importMoreInputId}
@@ -207,6 +223,7 @@ export function QuestionBankSection({
               className="collection-file-input"
               type="file"
               accept="application/json,.json"
+              disabled={importBusy}
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (file) void handleImportMore(file);
@@ -491,26 +508,6 @@ function MetricLine({ label, value }: { label: string; value: string }) {
     <div className="metric-inline">
       <span className="metric-inline-label">{label}</span>
       <span className="metric-inline-value">{value}</span>
-    </div>
-  );
-}
-
-function ImportErrors({ t, errors }: { t: Translator; errors: ValidationIssue[] }) {
-  return (
-    <div className="collection-errors import-more-errors" role="alert" aria-live="polite">
-      <p className="collection-errors-title">{t("test.importErrorsTitle")}</p>
-      <ul className="collection-errors-list">
-        {errors.slice(0, 6).map((error) => (
-          <li key={`${error.path}-${error.message}`}>
-            <strong>{error.path}</strong>: {error.message}
-          </li>
-        ))}
-      </ul>
-      {errors.length > 6 ? (
-        <p className="collection-errors-more">
-          {t("test.importErrorsMore", { shown: 6, total: errors.length })}
-        </p>
-      ) : null}
     </div>
   );
 }

@@ -3,8 +3,10 @@ import { AppShell } from "./app/AppShell";
 import { SectionId } from "./app/navigation";
 import {
   buildUpdatedQuestionCollection,
+  findDuplicateQuestions,
   ImportCollectionResult,
   ImportConflictResolution,
+  ImportProcessingState,
   PendingImportConflict,
 } from "./features/test/questionCollectionImport";
 import {
@@ -43,6 +45,23 @@ import {
 } from "./services/persistence";
 
 type ThemeMode = "dark" | "light";
+const SOFT_LARGE_IMPORT_BYTES = 10 * 1024 * 1024;
+const HARD_IMPORT_BYTES = 100 * 1024 * 1024;
+
+function yieldToUi() {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 0);
+  });
+}
+
+function buildFileTooLargeIssue(fileSize: number): ValidationIssue {
+  return {
+    severity: "error",
+    path: "file",
+    code: "file.tooLarge",
+    message: `This JSON file is ${(fileSize / 1024 / 1024).toFixed(1)} MB. The safe import limit is ${HARD_IMPORT_BYTES / 1024 / 1024} MB.`,
+  };
+}
 
 function App() {
   const [section, setSection] = useState<SectionId>("test");
@@ -59,6 +78,9 @@ function App() {
   const [pendingImportConflict, setPendingImportConflict] = useState<PendingImportConflict | null>(
     null,
   );
+  const [importProcessing, setImportProcessing] = useState<ImportProcessingState>({
+    stage: "idle",
+  });
 
   const t = useMemo(() => createTranslator(language), [language]);
 
@@ -120,28 +142,80 @@ function App() {
     file: File,
     merge = false,
   ): Promise<ImportCollectionResult> => {
-    const raw = await file.text();
-    const validation = validateQuestionCollectionJson(raw);
-    if (!validation.ok) {
-      setPendingImportConflict(null);
-      setValidationErrors(validation.errors);
+    const isLargeFile = file.size >= SOFT_LARGE_IMPORT_BYTES;
+    setPendingImportConflict(null);
+    setValidationErrors([]);
+
+    if (file.size > HARD_IMPORT_BYTES) {
+      setImportProcessing({ stage: "error", isLargeFile });
+      setValidationErrors([buildFileTooLargeIssue(file.size)]);
       return { status: "invalid" };
     }
 
-    const result = await importQuestionCollection(validation.collection, merge);
-    if (result.status === "conflict") {
-      setValidationErrors([]);
-      setPendingImportConflict({
-        incomingCollection: validation.collection,
-        duplicateQuestions: result.duplicateQuestions,
-      });
-      return { status: "conflict", duplicateQuestions: result.duplicateQuestions };
-    }
+    try {
+      setImportProcessing({ stage: "reading", isLargeFile });
+      await yieldToUi();
+      const raw = await file.text();
 
-    setCollection(result.collection);
-    setPendingImportConflict(null);
-    setValidationErrors([]);
-    return { status: "imported" };
+      setImportProcessing({ stage: "parsing", isLargeFile });
+      await yieldToUi();
+
+      setImportProcessing({ stage: "validating", isLargeFile });
+      await yieldToUi();
+      const validation = validateQuestionCollectionJson(raw);
+      if (!validation.ok) {
+        setImportProcessing({ stage: "error", isLargeFile });
+        setValidationErrors(validation.errors);
+        return { status: "invalid" };
+      }
+
+      setImportProcessing({ stage: "checkingDuplicates", isLargeFile });
+      await yieldToUi();
+      if (merge && collection) {
+        const duplicateQuestions = findDuplicateQuestions(
+          collection.questions,
+          validation.collection.questions,
+        );
+        if (duplicateQuestions.length > 0) {
+          setPendingImportConflict({
+            incomingCollection: validation.collection,
+            duplicateQuestions,
+          });
+          setImportProcessing({ stage: "done", isLargeFile });
+          return { status: "conflict", duplicateQuestions };
+        }
+      }
+
+      setImportProcessing({ stage: "persisting", isLargeFile });
+      await yieldToUi();
+      const result = await importQuestionCollection(validation.collection, merge);
+      if (result.status === "conflict") {
+        setPendingImportConflict({
+          incomingCollection: validation.collection,
+          duplicateQuestions: result.duplicateQuestions,
+        });
+        setImportProcessing({ stage: "done", isLargeFile });
+        return { status: "conflict", duplicateQuestions: result.duplicateQuestions };
+      }
+
+      setCollection(result.collection);
+      setPendingImportConflict(null);
+      setValidationErrors([]);
+      setImportProcessing({ stage: "done", isLargeFile });
+      return { status: "imported" };
+    } catch (error) {
+      console.error("Failed to import question collection", error);
+      setImportProcessing({ stage: "error", isLargeFile });
+      setValidationErrors([
+        {
+          severity: "error",
+          path: "import",
+          code: "import.failed",
+          message: "The question bank could not be imported. No questions were changed.",
+        },
+      ]);
+      return { status: "invalid" };
+    }
   };
 
   const resolveImportConflict = async (resolution: ImportConflictResolution) => {
@@ -290,6 +364,7 @@ function App() {
       }}
       onDiscardActiveRecovery={discardActiveRecovery}
       validationErrors={validationErrors}
+      importProcessing={importProcessing}
       pendingImportConflict={pendingImportConflict}
       onImportCollectionFile={importCollectionFile}
       onClearValidationErrors={() => setValidationErrors([])}

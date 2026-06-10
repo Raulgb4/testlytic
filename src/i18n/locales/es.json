@@ -251,7 +251,21 @@
     "tableRange": "Mostrando {start}-{end} de {total}",
     "paginationLabel": "Paginación de la tabla de preguntas",
     "pageStatus": "Página {page} de {total}",
-    "noMatches": "Ninguna pregunta coincide con los filtros actuales."
+    "noMatches": "Ninguna pregunta coincide con los filtros actuales.",
+    "importStage": {
+      "idle": "Listo para importar.",
+      "reading": "Leyendo archivo JSON...",
+      "parsing": "Analizando JSON...",
+      "validating": "Validando el esquema del banco de preguntas...",
+      "checkingDuplicates": "Buscando preguntas duplicadas...",
+      "persisting": "Guardando banco de preguntas...",
+      "error": "La importación falló. No se cambió ninguna pregunta.",
+      "done": "Procesamiento de importación finalizado."
+    },
+    "importLargeFileWarning": "Archivo grande detectado. La validación puede tardar un momento; mantén Testlytic abierto hasta que termine.",
+    "importErrorSummary": "Se encontraron {count} incidencia(s) de validación en {questions} pregunta(s).",
+    "importNoQuestionsChanged": "No se importó ninguna pregunta. Corrige el JSON e inténtalo de nuevo.",
+    "importErrorsCapped": "La validación se detuvo tras los primeros 100 errores. Corrige estos problemas e importa de nuevo para continuar."
   },
   "analytics": {
     "title": "Analítica",

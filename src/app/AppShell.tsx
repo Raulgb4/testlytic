@@ -5,6 +5,7 @@ import { SettingsSection } from "../features/settings/SettingsSection";
 import {
   ImportCollectionResult,
   ImportConflictResolution,
+  ImportProcessingState,
   PendingImportConflict,
 } from "../features/test/questionCollectionImport";
 import {
@@ -47,6 +48,7 @@ export function AppShell({
   onClearActiveRecovery,
   onDiscardActiveRecovery,
   validationErrors,
+  importProcessing,
   pendingImportConflict,
   onImportCollectionFile,
   onClearValidationErrors,
@@ -76,6 +78,7 @@ export function AppShell({
   onClearActiveRecovery: () => void;
   onDiscardActiveRecovery: () => void;
   validationErrors: ValidationIssue[];
+  importProcessing: ImportProcessingState;
   pendingImportConflict: PendingImportConflict | null;
   onImportCollectionFile: (file: File, merge?: boolean) => Promise<ImportCollectionResult>;
   onClearValidationErrors: () => void;
@@ -129,6 +132,7 @@ export function AppShell({
               t={t}
               collection={collection}
               validationErrors={validationErrors}
+              importProcessing={importProcessing}
               pendingImportConflict={pendingImportConflict}
               onImportFile={onImportCollectionFile}
               onClearValidationErrors={onClearValidationErrors}

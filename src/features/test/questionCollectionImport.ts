@@ -23,6 +23,22 @@ export type ImportCollectionResult =
   | { status: "invalid" }
   | { status: "cancelled" };
 
+export type ImportProcessingStage =
+  | "idle"
+  | "reading"
+  | "parsing"
+  | "validating"
+  | "checkingDuplicates"
+  | "persisting"
+  | "error"
+  | "done";
+
+export type ImportProcessingState = {
+  stage: ImportProcessingStage;
+  message?: string;
+  isLargeFile?: boolean;
+};
+
 function getQuestionFingerprint(question: CollectionQuestion) {
   return buildQuestionContentFingerprint(question);
 }

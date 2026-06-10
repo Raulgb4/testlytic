@@ -251,7 +251,21 @@
     "tableRange": "Showing {start}-{end} of {total}",
     "paginationLabel": "Question table pagination",
     "pageStatus": "Page {page} of {total}",
-    "noMatches": "No questions match the current filters."
+    "noMatches": "No questions match the current filters.",
+    "importStage": {
+      "idle": "Ready to import.",
+      "reading": "Reading JSON file...",
+      "parsing": "Parsing JSON...",
+      "validating": "Validating question bank schema...",
+      "checkingDuplicates": "Checking for duplicate questions...",
+      "persisting": "Saving question bank...",
+      "error": "Import failed. No questions were changed.",
+      "done": "Import processing finished."
+    },
+    "importLargeFileWarning": "Large file detected. Validation may take a moment; keep Testlytic open until it finishes.",
+    "importErrorSummary": "Found {count} validation issue(s) across {questions} question(s).",
+    "importNoQuestionsChanged": "No questions were imported. Fix the JSON and try again.",
+    "importErrorsCapped": "Validation stopped after the first 100 errors. Fix these issues and import again to continue checking."
   },
   "analytics": {
     "title": "Analytics",
