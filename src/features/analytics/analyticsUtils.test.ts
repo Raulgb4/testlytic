@@ -3,12 +3,15 @@ import { QuestionCollection } from "../test/questionCollectionTypes";
 import { CompletedTestAttempt } from "../test/testTypes";
 import {
   calculateAnalyticsSummary,
+  calculateAnswerOutcomeDistribution,
   calculateBankSummary,
   calculateCategoryPerformance,
   calculateDifficultyDistribution,
   calculateExposureDistribution,
   calculateRecentTrend,
   calculateSeenDistribution,
+  buildBankInsights,
+  buildUserInsights,
   getStrongestCategories,
   getWeakestCategories,
 } from "./analyticsUtils";
@@ -145,8 +148,20 @@ describe("analyticsUtils", () => {
   });
 
   it("calculates exposure and seen distributions", () => {
+    expect(calculateAnswerOutcomeDistribution(attempts).map((item) => item.label)).toEqual([
+      "correct",
+      "incorrect",
+      "unanswered",
+    ]);
     expect(calculateExposureDistribution(collection).map((item) => item.value)).toEqual([
       1, 1, 1, 0, 1,
+    ]);
+    expect(calculateExposureDistribution(collection).map((item) => item.label)).toEqual([
+      "neverSeen",
+      "seenOnce",
+      "views2To3",
+      "views4To7",
+      "views8Plus",
     ]);
     expect(calculateSeenDistribution(collection).map((item) => item.value)).toEqual([3, 1]);
   });
@@ -170,6 +185,13 @@ describe("analyticsUtils", () => {
     calculateDifficultyDistribution(collection, "userDeclaredDifficulty");
 
     expect(collection).toEqual(snapshot);
+  });
+
+  it("returns structured insight codes instead of final UI text", () => {
+    expect(buildUserInsights(attempts, collection).map((insight) => insight.code)).toContain(
+      "focusWeakCategory",
+    );
+    expect(buildBankInsights(collection).map((insight) => insight.code)).toContain("unseenBacklog");
   });
 });
 

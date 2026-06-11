@@ -27,6 +27,59 @@ export type CategoryPerformanceItem = {
   accuracyPercentage: number;
 };
 
+export type UserInsight =
+  | {
+      code: "completeTest";
+    }
+  | {
+      code: "focusWeakCategory";
+      category: string;
+      accuracy: number;
+      total: number;
+    }
+  | {
+      code: "trendImproving";
+      delta: number;
+    }
+  | {
+      code: "trendDeclining";
+      delta: number;
+    }
+  | {
+      code: "unansweredPractice";
+      count: number;
+    }
+  | {
+      code: "reviewMissed";
+      question: string;
+    }
+  | {
+      code: "balanced";
+    };
+
+export type BankInsight =
+  | {
+      code: "importBank";
+    }
+  | {
+      code: "unseenBacklog";
+      count: number;
+    }
+  | {
+      code: "rateDifficulty";
+      percentage: number;
+    }
+  | {
+      code: "exposureUneven";
+    }
+  | {
+      code: "underrepresentedTopic";
+      topic: string;
+    }
+  | {
+      code: "healthy";
+    };
+
 export function calculateAnalyticsSummary(attempts: CompletedTestAttempt[]) {
   const testsCompleted = attempts.length;
   const totalGrade = attempts.reduce((sum, attempt) => sum + attempt.gradeOutOf10, 0);
@@ -82,9 +135,9 @@ export function calculateAnswerOutcomeDistribution(attempts: CompletedTestAttemp
   const incorrect = attempts.reduce((sum, attempt) => sum + attempt.incorrectAnswers, 0);
   const unanswered = attempts.reduce((sum, attempt) => sum + attempt.unansweredQuestions, 0);
   return withPercentages([
-    { label: "Correct", value: correct },
-    { label: "Incorrect", value: incorrect },
-    { label: "Unanswered", value: unanswered },
+    { label: "correct", value: correct },
+    { label: "incorrect", value: incorrect },
+    { label: "unanswered", value: unanswered },
   ]);
 }
 
@@ -149,16 +202,16 @@ export function calculateTrendDelta(attempts: CompletedTestAttempt[]) {
   const sorted = attempts
     .slice()
     .sort((a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime());
-  if (sorted.length < 2) return { label: "Not enough data", value: 0 };
+  if (sorted.length < 2) return { label: "notEnoughData", value: 0 };
   const windowSize = Math.min(5, Math.floor(sorted.length / 2));
   const previous = sorted.slice(-windowSize * 2, -windowSize);
   const recent = sorted.slice(-windowSize);
   const previousAverage = average(previous.map((attempt) => attempt.gradeOutOf10));
   const recentAverage = average(recent.map((attempt) => attempt.gradeOutOf10));
   const value = recentAverage - previousAverage;
-  if (value > 0.25) return { label: "Improving", value };
-  if (value < -0.25) return { label: "Declining", value };
-  return { label: "Stable", value };
+  if (value > 0.25) return { label: "improving", value };
+  if (value < -0.25) return { label: "declining", value };
+  return { label: "stable", value };
 }
 
 export function calculateBankSummary(collection: QuestionCollection | null) {
@@ -186,9 +239,9 @@ export function calculateBankSummary(collection: QuestionCollection | null) {
     coveragePercentage:
       totalQuestions > 0 ? ((totalQuestions - neverSeen) / totalQuestions) * 100 : 0,
     averageExposure: totalQuestions > 0 ? exposureTotal / totalQuestions : 0,
-    mostRepresentedCategory: categoryDistribution[0]?.label || "No data",
+    mostRepresentedCategory: categoryDistribution[0]?.label || "",
     leastRepresentedCategory:
-      categoryDistribution.slice().sort((a, b) => a.value - b.value)[0]?.label || "No data",
+      categoryDistribution.slice().sort((a, b) => a.value - b.value)[0]?.label || "",
     difficultyCoveragePercentage: totalQuestions > 0 ? (userRated / totalQuestions) * 100 : 0,
   };
 }
@@ -205,7 +258,7 @@ export function calculateQuestionDistribution(
     const label =
       groupBy === "category"
         ? question.questionCategory
-        : question.questionSubcategory || "No subcategory";
+        : question.questionSubcategory || "noSubcategory";
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
   return withPercentages(
@@ -217,11 +270,11 @@ export function calculateQuestionDistribution(
 
 export function calculateExposureDistribution(collection: QuestionCollection | null) {
   const buckets = [
-    { label: "Never seen", value: 0 },
-    { label: "Seen once", value: 0 },
-    { label: "2-3 views", value: 0 },
-    { label: "4-7 views", value: 0 },
-    { label: "8+ views", value: 0 },
+    { label: "neverSeen", value: 0 },
+    { label: "seenOnce", value: 0 },
+    { label: "views2To3", value: 0 },
+    { label: "views4To7", value: 0 },
+    { label: "views8Plus", value: 0 },
   ];
   for (const question of collection?.questions ?? []) {
     const exposure = question.analytics.exposureCount;
@@ -239,8 +292,8 @@ export function calculateSeenDistribution(collection: QuestionCollection | null)
   const neverSeen =
     collection?.questions.filter((q) => q.analytics.exposureCount === 0).length ?? 0;
   return withPercentages([
-    { label: "Seen", value: total - neverSeen },
-    { label: "Never seen", value: neverSeen },
+    { label: "seen", value: total - neverSeen },
+    { label: "neverSeen", value: neverSeen },
   ]);
 }
 
@@ -250,10 +303,10 @@ export function calculateDifficultyDistribution(
 ) {
   const order: DifficultyLevel[] = ["unrated", "low", "medium", "high"];
   const labels: Record<DifficultyLevel, string> = {
-    unrated: "Unrated",
-    low: "Low",
-    medium: "Medium",
-    high: "High",
+    unrated: "unrated",
+    low: "low",
+    medium: "medium",
+    high: "high",
   };
   const buckets = order.map((level) => ({ label: labels[level], value: 0 }));
   for (const question of collection?.questions ?? []) {
@@ -275,7 +328,7 @@ export function getMostFailedQuestions(collection: QuestionCollection | null, li
     .slice(0, limit)
     .map((question) => ({
       label: question.question,
-      value: `${question.analytics.timesAnsweredIncorrectly} failed`,
+      value: String(question.analytics.timesAnsweredIncorrectly),
       detail: `${question.questionCategory}${question.questionSubcategory ? ` · ${question.questionSubcategory}` : ""}`,
       score: question.analytics.timesAnsweredIncorrectly,
     }));
@@ -285,7 +338,7 @@ export function getQuestionExposureRankings(collection: QuestionCollection | nul
   const questions = collection?.questions ?? [];
   const toRanking = (question: CollectionQuestion) => ({
     label: question.question,
-    value: `${question.analytics.exposureCount} views`,
+    value: String(question.analytics.exposureCount),
     detail: `${question.questionCategory}${question.questionSubcategory ? ` · ${question.questionSubcategory}` : ""}`,
     score: question.analytics.exposureCount,
   });
@@ -337,71 +390,58 @@ export function buildUserInsights(
   collection: QuestionCollection | null,
 ) {
   if (attempts.length === 0) {
-    return ["Complete a test to unlock performance recommendations."];
+    return [{ code: "completeTest" } satisfies UserInsight];
   }
   const summary = calculateAnalyticsSummary(attempts);
   const categories = calculateCategoryPerformance(attempts);
   const weakest = getWeakestCategories(categories, 1)[0];
   const trend = calculateTrendDelta(attempts);
   const failed = getMostFailedQuestions(collection, 1)[0];
-  const insights = [];
+  const insights: UserInsight[] = [];
 
   if (weakest) {
-    insights.push(
-      `Focus next on ${weakest.category}: ${weakest.accuracyPercentage.toFixed(1)}% accuracy across ${weakest.total} questions.`,
-    );
+    insights.push({
+      code: "focusWeakCategory",
+      category: weakest.category,
+      accuracy: weakest.accuracyPercentage,
+      total: weakest.total,
+    });
   }
-  if (trend.label === "Improving") {
-    insights.push(
-      `Recent results are improving by ${trend.value.toFixed(1)} points. Keep the current routine.`,
-    );
-  } else if (trend.label === "Declining") {
-    insights.push(
-      `Recent results are down ${Math.abs(trend.value).toFixed(1)} points. Use a shorter focused review session.`,
-    );
+  if (trend.label === "improving") {
+    insights.push({ code: "trendImproving", delta: trend.value });
+  } else if (trend.label === "declining") {
+    insights.push({ code: "trendDeclining", delta: Math.abs(trend.value) });
   }
   if (summary.unansweredQuestions > 0) {
-    insights.push(
-      `You left ${summary.unansweredQuestions} questions unanswered. Practice timing and elimination strategy.`,
-    );
+    insights.push({ code: "unansweredPractice", count: summary.unansweredQuestions });
   }
   if (failed) {
-    insights.push(`Review repeatedly missed question: ${truncate(failed.label, 96)}`);
+    insights.push({ code: "reviewMissed", question: truncate(failed.label, 96) });
   }
-  return insights.length > 0
-    ? insights.slice(0, 4)
-    : ["Performance is balanced. Add mixed tests to keep coverage broad."];
+  return insights.length > 0 ? insights.slice(0, 4) : [{ code: "balanced" } satisfies UserInsight];
 }
 
 export function buildBankInsights(collection: QuestionCollection | null) {
   const summary = calculateBankSummary(collection);
-  if (summary.totalQuestions === 0)
-    return ["Import a question bank to inspect coverage and balance."];
+  if (summary.totalQuestions === 0) return [{ code: "importBank" } satisfies BankInsight];
   const health = calculateSmartSelectionHealth(collection);
-  const insights = [];
+  const insights: BankInsight[] = [];
   if (summary.neverSeen > 0) {
-    insights.push(
-      `${summary.neverSeen} questions are still unseen. Run broad tests to improve coverage.`,
-    );
+    insights.push({ code: "unseenBacklog", count: summary.neverSeen });
   }
   if (summary.difficultyCoveragePercentage < 60) {
-    insights.push(
-      `Only ${summary.difficultyCoveragePercentage.toFixed(1)}% of questions have user-rated difficulty. Rate more questions after review.`,
-    );
+    insights.push({ code: "rateDifficulty", percentage: summary.difficultyCoveragePercentage });
   }
   if (health.exposureImbalance > 3) {
-    insights.push(
-      "Exposure is uneven. Smart Selection will favor less-seen questions to rebalance practice.",
-    );
+    insights.push({ code: "exposureUneven" });
   }
   if (health.underrepresentedCategories.length > 0) {
-    insights.push(
-      `Underrepresented topic: ${health.underrepresentedCategories[0].label}. Import more questions if this area matters.`,
-    );
+    insights.push({
+      code: "underrepresentedTopic",
+      topic: health.underrepresentedCategories[0].label,
+    });
   }
-  return insights.length > 0
-    ? insights.slice(0, 4)
-    : ["Question bank coverage looks healthy for mixed practice."];
+  return insights.length > 0 ? insights.slice(0, 4) : [{ code: "healthy" } satisfies BankInsight];
 }
 
 export function truncate(value: string, maxLength: number) {

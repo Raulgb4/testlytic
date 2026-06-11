@@ -2,11 +2,22 @@
   align-items: start;
 }
 
-.analytics-hero-card,
+.analytics-page-header,
+.analytics-top-tabs,
 .analytics-filter-card,
 .analytics-wide-card,
 .analytics-empty-card {
   grid-column: span 12;
+}
+
+.analytics-half-card {
+  grid-column: span 6;
+}
+
+.analytics-page-header h2 {
+  margin: 0;
+  font-size: clamp(1.65rem, 2vw, 2.2rem);
+  line-height: 1.1;
 }
 
 .analytics-empty-card {
@@ -15,33 +26,48 @@
   text-align: center;
 }
 
-.analytics-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+.analytics-top-tabs {
+  display: flex;
+  justify-content: center;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  margin-top: -4px;
 }
 
 .analytics-tab {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+  position: relative;
+  flex: 1 1 0;
+  max-width: 340px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   font: inherit;
-  font-weight: 800;
-  min-height: 54px;
-  padding: 0.85rem 1rem;
+  font-weight: 700;
+  min-height: 50px;
+  padding: 0.9rem 1rem;
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
     color 160ms ease,
-    transform 160ms ease;
+    background 160ms ease;
+}
+
+.analytics-tab::after {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 999px 999px 0 0;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 160ms ease;
 }
 
 .analytics-tab:hover {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   color: var(--text);
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--surface-2) 72%, transparent);
 }
 
 .analytics-tab:focus-visible {
@@ -50,13 +76,11 @@
 }
 
 .analytics-tab.active {
-  border-color: color-mix(in srgb, var(--accent) 65%, var(--border));
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--accent-soft) 70%, transparent),
-    color-mix(in srgb, var(--surface-2) 92%, transparent)
-  );
   color: var(--accent-strong);
+}
+
+.analytics-tab.active::after {
+  opacity: 1;
 }
 
 .analytics-filter-grid {
@@ -217,13 +241,17 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .analytics-half-card {
+    grid-column: span 12;
+  }
+
   .analytics-health-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 860px) {
-  .analytics-tabs,
+  .analytics-top-tabs,
   .analytics-filter-grid,
   .analytics-kpi-grid,
   .analytics-health-grid {
