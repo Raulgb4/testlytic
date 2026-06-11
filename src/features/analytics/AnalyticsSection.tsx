@@ -90,10 +90,6 @@ export function AnalyticsSection({
 
   return (
     <div className="view-grid analytics-view">
-      <header className="analytics-page-header">
-        <h2>{t("analytics.title")}</h2>
-      </header>
-
       <AnalyticsTabs t={t} activeTab={activeTab} onChange={setActiveTab} />
 
       <AnalyticsFilterBar
@@ -311,7 +307,7 @@ function UserAnalyticsTab({
       <Card
         title={t("analytics.trendTitle")}
         subtitle={t("analytics.trendSubtitle")}
-        className="analytics-wide-card"
+        className="analytics-half-card"
       >
         <div className="analytics-bars">
           {trend.map((item) => (
@@ -366,6 +362,7 @@ function UserAnalyticsTab({
         t={t}
         title={t("analytics.studyRecommendations")}
         insights={insights.map((insight) => formatUserInsight(t, insight))}
+        compact
       />
     </>
   );
@@ -558,6 +555,7 @@ function QuestionBankAnalyticsTab({
         t={t}
         title={t("analytics.bankRecommendations")}
         insights={insights.map((insight) => formatBankInsight(t, insight))}
+        compact
       />
     </>
   );
@@ -647,16 +645,18 @@ function InsightPanel({
   t,
   title,
   insights,
+  compact = false,
 }: {
   t: Translator;
   title: string;
   insights: string[];
+  compact?: boolean;
 }) {
   return (
     <Card
       title={title}
       subtitle={t("analytics.insightPanelSubtitle")}
-      className="analytics-wide-card"
+      className={compact ? "analytics-half-card" : "analytics-wide-card"}
     >
       <div className="analytics-insight-list">
         {insights.map((insight) => (

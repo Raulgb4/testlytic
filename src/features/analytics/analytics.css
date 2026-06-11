@@ -1,8 +1,8 @@
 .analytics-view {
   align-items: start;
+  gap: 12px;
 }
 
-.analytics-page-header,
 .analytics-top-tabs,
 .analytics-filter-card,
 .analytics-wide-card,
@@ -12,12 +12,6 @@
 
 .analytics-half-card {
   grid-column: span 6;
-}
-
-.analytics-page-header h2 {
-  margin: 0;
-  font-size: clamp(1.65rem, 2vw, 2.2rem);
-  line-height: 1.1;
 }
 
 .analytics-empty-card {
@@ -31,7 +25,8 @@
   justify-content: center;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface) 82%, transparent);
-  margin-top: -4px;
+  margin: -22px -22px 0;
+  padding: 0 22px;
 }
 
 .analytics-tab {
@@ -89,6 +84,11 @@
   gap: 12px;
 }
 
+.analytics-view > .card {
+  padding: 12px;
+  gap: 10px;
+}
+
 .analytics-filter-grid label {
   display: grid;
   gap: 6px;
@@ -115,11 +115,12 @@
 
 .analytics-kpi-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .analytics-bars {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .analytics-bar-row {
@@ -154,7 +155,7 @@
 .analytics-ranking-list,
 .analytics-insight-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .analytics-ranking-row {
@@ -251,11 +252,22 @@
 }
 
 @media (max-width: 860px) {
-  .analytics-top-tabs,
   .analytics-filter-grid,
   .analytics-kpi-grid,
   .analytics-health-grid {
     grid-template-columns: 1fr;
+  }
+
+  .analytics-top-tabs {
+    margin-right: -22px;
+    margin-left: -22px;
+    padding: 0 12px;
+  }
+
+  .analytics-tab {
+    max-width: none;
+    padding-right: 0.6rem;
+    padding-left: 0.6rem;
   }
 
   .analytics-bar-row,
