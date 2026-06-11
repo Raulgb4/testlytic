@@ -89,7 +89,7 @@ export function AnalyticsSection({
   );
 
   return (
-    <div className="view-grid analytics-view">
+    <div className="analytics-view">
       <AnalyticsTabs t={t} activeTab={activeTab} onChange={setActiveTab} />
 
       <AnalyticsFilterBar
@@ -304,11 +304,7 @@ function UserAnalyticsTab({
         ]}
       />
 
-      <Card
-        title={t("analytics.trendTitle")}
-        subtitle={t("analytics.trendSubtitle")}
-        className="analytics-half-card"
-      >
+      <Card title={t("analytics.trendTitle")} subtitle={t("analytics.trendSubtitle")}>
         <div className="analytics-bars">
           {trend.map((item) => (
             <div key={`${item.label}-${item.title}`} className="analytics-bar-row">
@@ -362,7 +358,6 @@ function UserAnalyticsTab({
         t={t}
         title={t("analytics.studyRecommendations")}
         insights={insights.map((insight) => formatUserInsight(t, insight))}
-        compact
       />
     </>
   );
@@ -530,7 +525,6 @@ function QuestionBankAnalyticsTab({
       <Card
         title={t("analytics.smartSelectionHealth")}
         subtitle={t("analytics.smartSelectionHealthSubtitle")}
-        className="analytics-half-card"
       >
         <div className="analytics-health-grid">
           <HealthMetric
@@ -555,7 +549,6 @@ function QuestionBankAnalyticsTab({
         t={t}
         title={t("analytics.bankRecommendations")}
         insights={insights.map((insight) => formatBankInsight(t, insight))}
-        compact
       />
     </>
   );
@@ -563,11 +556,7 @@ function QuestionBankAnalyticsTab({
 
 function AnalyticsKpiGrid({ t, items }: { t: Translator; items: Array<[string, string, string]> }) {
   return (
-    <Card
-      title={t("analytics.keyMetrics")}
-      subtitle={t("analytics.keyMetricsSubtitle")}
-      className="analytics-wide-card"
-    >
+    <Card title={t("analytics.keyMetrics")} subtitle={t("analytics.keyMetricsSubtitle")}>
       <div className="kpi-grid analytics-kpi-grid">
         {items.map(([label, value, change]) => (
           <MetricCard key={label} item={{ label, value, change }} />
@@ -589,7 +578,7 @@ function DistributionBars({
   items: DistributionItem[];
 }) {
   return (
-    <Card title={title} subtitle={subtitle} className="analytics-half-card">
+    <Card title={title} subtitle={subtitle}>
       <div className="analytics-bars">
         {items.map((item) => (
           <div key={item.label} className="analytics-bar-row">
@@ -620,7 +609,7 @@ function RankingList({
   items: RankingItem[];
 }) {
   return (
-    <Card title={title} subtitle={subtitle} className="analytics-half-card">
+    <Card title={title} subtitle={subtitle}>
       {items.length > 0 ? (
         <div className="analytics-ranking-list">
           {items.map((item, index) => (
@@ -645,19 +634,13 @@ function InsightPanel({
   t,
   title,
   insights,
-  compact = false,
 }: {
   t: Translator;
   title: string;
   insights: string[];
-  compact?: boolean;
 }) {
   return (
-    <Card
-      title={title}
-      subtitle={t("analytics.insightPanelSubtitle")}
-      className={compact ? "analytics-half-card" : "analytics-wide-card"}
-    >
+    <Card title={title} subtitle={t("analytics.insightPanelSubtitle")}>
       <div className="analytics-insight-list">
         {insights.map((insight) => (
           <article key={insight} className="analytics-insight">

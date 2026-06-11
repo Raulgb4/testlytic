@@ -1,17 +1,14 @@
 .analytics-view {
-  align-items: start;
-  gap: 12px;
+  width: min(960px, 100%);
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.analytics-top-tabs,
-.analytics-filter-card,
-.analytics-wide-card,
-.analytics-empty-card {
-  grid-column: span 12;
-}
-
-.analytics-half-card {
-  grid-column: span 6;
+.analytics-view > .card,
+.analytics-top-tabs {
+  width: 100%;
 }
 
 .analytics-empty-card {
@@ -25,14 +22,14 @@
   justify-content: center;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface) 82%, transparent);
-  margin: -22px -22px 0;
-  padding: 0 22px;
+  margin: 0;
+  padding: 0;
 }
 
 .analytics-tab {
   position: relative;
   flex: 1 1 0;
-  max-width: 340px;
+  max-width: none;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -79,18 +76,19 @@
 }
 
 .analytics-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
 .analytics-view > .card {
-  padding: 12px;
-  gap: 10px;
+  padding: 16px;
+  gap: 12px;
 }
 
 .analytics-filter-grid label {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   color: var(--text-muted);
   font-size: 0.78rem;
@@ -114,18 +112,19 @@
 }
 
 .analytics-kpi-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .analytics-bars {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
 .analytics-bar-row {
-  display: grid;
-  grid-template-columns: minmax(130px, 1.1fr) minmax(180px, 2fr) minmax(44px, auto);
+  display: flex;
   align-items: center;
   gap: 10px;
   color: var(--text-muted);
@@ -133,8 +132,19 @@
 }
 
 .analytics-bar-row > span:first-child {
+  flex: 1 1 180px;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.analytics-bar-row .analytics-bar-track {
+  flex: 2 1 240px;
+}
+
+.analytics-bar-row > strong {
+  flex: 0 0 auto;
+  min-width: 44px;
+  text-align: right;
 }
 
 .analytics-bar-track {
@@ -154,13 +164,13 @@
 
 .analytics-ranking-list,
 .analytics-insight-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
 .analytics-ranking-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: 12px;
   border: 1px solid var(--border);
@@ -178,13 +188,15 @@
 }
 
 .analytics-ranking-row > strong:last-child {
+  margin-left: auto;
   white-space: nowrap;
   color: var(--accent-strong);
 }
 
 .analytics-rank {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 34px;
   min-height: 34px;
   border-radius: 999px;
@@ -211,9 +223,9 @@
 }
 
 .analytics-health-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .analytics-health-metric {
@@ -221,7 +233,8 @@
   border-radius: 12px;
   background: color-mix(in srgb, var(--surface-2) 92%, transparent);
   padding: 0.85rem;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
 }
 
@@ -238,40 +251,26 @@
 }
 
 @media (max-width: 1240px) {
-  .analytics-kpi-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .analytics-half-card {
-    grid-column: span 12;
-  }
-
-  .analytics-health-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .analytics-view {
+    width: min(920px, 100%);
   }
 }
 
 @media (max-width: 860px) {
-  .analytics-filter-grid,
-  .analytics-kpi-grid,
-  .analytics-health-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .analytics-top-tabs {
-    margin-right: -22px;
-    margin-left: -22px;
-    padding: 0 12px;
-  }
-
   .analytics-tab {
-    max-width: none;
     padding-right: 0.6rem;
     padding-left: 0.6rem;
   }
 
   .analytics-bar-row,
   .analytics-ranking-row {
-    grid-template-columns: 1fr;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .analytics-bar-row > strong,
+  .analytics-ranking-row > strong:last-child {
+    margin-left: 0;
+    text-align: left;
   }
 }
