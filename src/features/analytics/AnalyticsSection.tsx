@@ -92,19 +92,21 @@ export function AnalyticsSection({
     <div className="analytics-view">
       <AnalyticsTabs t={t} activeTab={activeTab} onChange={setActiveTab} />
 
-      <AnalyticsFilterBar
-        t={t}
-        filters={filters}
-        categories={categories}
-        subcategories={subcategories}
-        onChange={setFilters}
-      />
+      <div className="analytics-report">
+        <AnalyticsFilterBar
+          t={t}
+          filters={filters}
+          categories={categories}
+          subcategories={subcategories}
+          onChange={setFilters}
+        />
 
-      {activeTab === "user" ? (
-        <UserAnalyticsTab t={t} attempts={filteredAttempts} collection={filteredCollection} />
-      ) : (
-        <QuestionBankAnalyticsTab t={t} collection={filteredCollection} />
-      )}
+        {activeTab === "user" ? (
+          <UserAnalyticsTab t={t} attempts={filteredAttempts} collection={filteredCollection} />
+        ) : (
+          <QuestionBankAnalyticsTab t={t} collection={filteredCollection} />
+        )}
+      </div>
     </div>
   );
 }
