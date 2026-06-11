@@ -1,4 +1,5 @@
 import { RuntimeQuestion, TestDefinition } from "../testTypes";
+import { getEffectiveTimeLimitMinutes } from "../testRuntimeUtils";
 import { ExamPdfPayload } from "./examPdfTypes";
 import { getCorrectOptionLabels } from "./pdfLayoutUtils";
 
@@ -26,7 +27,7 @@ export function buildExamPdfPayload({
   const subcategories = uniqueSorted(
     runtimeQuestions.map((question) => question.questionSubcategory),
   );
-  const effectiveTimeLimit = definition.timeLimitEnabled ? definition.timeLimitMinutes : 0;
+  const effectiveTimeLimit = getEffectiveTimeLimitMinutes(definition);
 
   return {
     definition,

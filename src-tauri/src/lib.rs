@@ -1223,6 +1223,13 @@ fn save_test_definition(
     definition: TestDefinitionDto,
 ) -> CommandResult<()> {
     let mut conn = state.conn.lock().map_err(|error| error.to_string())?;
+    save_test_definition_to_conn(&mut conn, &definition)
+}
+
+fn save_test_definition_to_conn(
+    conn: &mut Connection,
+    definition: &TestDefinitionDto,
+) -> CommandResult<()> {
     let tx = conn.transaction().map_err(|error| error.to_string())?;
     tx.execute(
         "INSERT INTO test_definitions(id, title, question_limit, allow_unanswered, time_limit_enabled, time_limit_minutes, negative_marking_enabled, penalty_per_incorrect_answer, created_at, updated_at)
@@ -1321,6 +1328,13 @@ fn save_completed_attempt(
     request: SaveCompletedAttemptRequest,
 ) -> CommandResult<Vec<QuestionExposureDto>> {
     let mut conn = state.conn.lock().map_err(|error| error.to_string())?;
+    save_completed_attempt_to_conn(&mut conn, &request)
+}
+
+fn save_completed_attempt_to_conn(
+    conn: &mut Connection,
+    request: &SaveCompletedAttemptRequest,
+) -> CommandResult<Vec<QuestionExposureDto>> {
     let tx = conn.transaction().map_err(|error| error.to_string())?;
     let attempt = &request.attempt;
     let mut original_question_ids = Vec::new();
@@ -1348,8 +1362,8 @@ fn save_completed_attempt(
         tx.execute("INSERT INTO test_attempt_answers(attempt_id, queue_id, source_question_id, retry_number, question_snapshot, selected_option_ids_json, correct_option_ids_json, is_correct, is_unanswered, answered_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", params![attempt.id, answer.queue_id, answer.source_question_id, answer.retry_number, serde_json::to_string(&answer.question).map_err(|error| error.to_string())?, serde_json::to_string(&answer.selected_option_ids).map_err(|error| error.to_string())?, serde_json::to_string(&answer.correct_option_ids).map_err(|error| error.to_string())?, answer.is_correct as i64, answer.is_unanswered as i64, answer.answered_at]).map_err(|error| error.to_string())?;
     }
     rebuild_question_selection_stats(&tx).map_err(|error| error.to_string())?;
-    let exposures = load_question_exposures(&tx, &original_question_ids)
-        .map_err(|error| error.to_string())?;
+    let exposures =
+        load_question_exposures(&tx, &original_question_ids).map_err(|error| error.to_string())?;
     tx.commit().map_err(|error| error.to_string())?;
     Ok(exposures)
 }
@@ -1411,39 +1425,43 @@ fn get_active_test_attempt(
     state: State<'_, DbState>,
 ) -> CommandResult<Option<ActiveTestRecoveryDto>> {
     let conn = state.conn.lock().map_err(|error| error.to_string())?;
-    let row = conn
-        .query_row(
-            "SELECT id, test_definition_snapshot, active_attempt_snapshot, saved_at, app_version FROM active_test_attempts ORDER BY saved_at DESC LIMIT 1",
-            [],
-            |row| {
-                let test_definition_json: String = row.get(1)?;
-                let active_attempt_json: String = row.get(2)?;
-                let test_definition = serde_json::from_str(&test_definition_json).map_err(|error| {
-                    rusqlite::Error::FromSqlConversionFailure(
-                        1,
-                        rusqlite::types::Type::Text,
-                        Box::new(error),
-                    )
-                })?;
-                let active_attempt = serde_json::from_str(&active_attempt_json).map_err(|error| {
-                    rusqlite::Error::FromSqlConversionFailure(
-                        2,
-                        rusqlite::types::Type::Text,
-                        Box::new(error),
-                    )
-                })?;
-                Ok(ActiveTestRecoveryDto {
-                    id: row.get(0)?,
-                    test_definition,
-                    active_attempt,
-                    saved_at: row.get(3)?,
-                    app_version: row.get(4)?,
-                })
-            },
-        )
-        .optional()
-        .map_err(|error| error.to_string())?;
-    Ok(row)
+    get_active_test_attempt_from_conn(&conn)
+}
+
+fn get_active_test_attempt_from_conn(
+    conn: &Connection,
+) -> CommandResult<Option<ActiveTestRecoveryDto>> {
+    conn.query_row(
+        "SELECT id, test_definition_snapshot, active_attempt_snapshot, saved_at, app_version FROM active_test_attempts ORDER BY saved_at DESC LIMIT 1",
+        [],
+        |row| {
+            let test_definition_json: String = row.get(1)?;
+            let active_attempt_json: String = row.get(2)?;
+            let test_definition = serde_json::from_str(&test_definition_json).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    1,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })?;
+            let active_attempt = serde_json::from_str(&active_attempt_json).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    2,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })?;
+            Ok(ActiveTestRecoveryDto {
+                id: row.get(0)?,
+                test_definition,
+                active_attempt,
+                saved_at: row.get(3)?,
+                app_version: row.get(4)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -1452,6 +1470,13 @@ fn save_active_test_attempt(
     recovery: ActiveTestRecoveryDto,
 ) -> CommandResult<()> {
     let conn = state.conn.lock().map_err(|error| error.to_string())?;
+    save_active_test_attempt_to_conn(&conn, &recovery)
+}
+
+fn save_active_test_attempt_to_conn(
+    conn: &Connection,
+    recovery: &ActiveTestRecoveryDto,
+) -> CommandResult<()> {
     let test_definition_snapshot =
         serde_json::to_string(&recovery.test_definition).map_err(|error| error.to_string())?;
     let active_attempt_snapshot =
@@ -1469,6 +1494,10 @@ fn save_active_test_attempt(
 #[tauri::command]
 fn clear_active_test_attempt(state: State<'_, DbState>) -> CommandResult<()> {
     let conn = state.conn.lock().map_err(|error| error.to_string())?;
+    clear_active_test_attempt_from_conn(&conn)
+}
+
+fn clear_active_test_attempt_from_conn(conn: &Connection) -> CommandResult<()> {
     conn.execute("DELETE FROM active_test_attempts", [])
         .map_err(|error| error.to_string())?;
     Ok(())
@@ -1479,6 +1508,15 @@ mod tests {
     use super::*;
 
     fn test_question(id: &str, difficulty: &str) -> CollectionQuestionDto {
+        test_question_with_filter(id, difficulty, "Category", None)
+    }
+
+    fn test_question_with_filter(
+        id: &str,
+        difficulty: &str,
+        category: &str,
+        subcategory: Option<&str>,
+    ) -> CollectionQuestionDto {
         CollectionQuestionDto {
             id: id.into(),
             question: format!("Question {id}"),
@@ -1491,8 +1529,8 @@ mod tests {
             correct_options: vec!["a".into()],
             shuffle_options: true,
             correct_answer_explanation: None,
-            question_category: "Category".into(),
-            question_subcategory: None,
+            question_category: category.into(),
+            question_subcategory: subcategory.map(String::from),
             question_source: None,
             analytics: QuestionAnalyticsDto {
                 computed_difficulty: "unrated".into(),
@@ -1501,6 +1539,159 @@ mod tests {
                 times_answered_correctly: 0,
                 exposure_count: 0,
             },
+        }
+    }
+
+    fn test_definition(
+        categories: Vec<&str>,
+        subcategories: Option<Vec<&str>>,
+        question_limit: i64,
+    ) -> TestDefinitionDto {
+        TestDefinitionDto {
+            id: "test-1".into(),
+            title: "Filtering test".into(),
+            question_limit,
+            included_categories: categories.into_iter().map(String::from).collect(),
+            included_subcategories: subcategories
+                .map(|items| items.into_iter().map(String::from).collect()),
+            allow_unanswered: false,
+            time_limit_enabled: Some(false),
+            negative_marking_enabled: false,
+            penalty_per_incorrect_answer: 0.0,
+            time_limit_minutes: 0,
+            created_at: "2026-06-11T00:00:00Z".into(),
+            updated_at: "2026-06-11T00:00:00Z".into(),
+        }
+    }
+
+    fn setup_filter_bank() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        for question in [
+            test_question_with_filter("t1-a1", "unrated", "T1", Some("A1.2019")),
+            test_question_with_filter("t1-a2", "unrated", "T1", Some("A2.2012")),
+            test_question_with_filter("t2-a1", "unrated", "T2", Some("A1.2019")),
+            test_question_with_filter("t2-a2", "unrated", "T2", Some("A2.2012")),
+            test_question_with_filter("t1-none", "unrated", "T1", None),
+        ] {
+            insert_question(&conn, &question, None).unwrap();
+        }
+        conn
+    }
+
+    fn eligible_ids(conn: &Connection, definition: &TestDefinitionDto) -> Vec<String> {
+        let mut ids = load_eligible_questions(conn, definition)
+            .unwrap()
+            .into_iter()
+            .map(|item| item.question.id)
+            .collect::<Vec<_>>();
+        ids.sort();
+        ids
+    }
+
+    fn generated_ids(conn: &Connection, definition: &TestDefinitionDto, seed: u64) -> Vec<String> {
+        let eligible = load_eligible_questions(conn, definition).unwrap();
+        let now = chrono::DateTime::parse_from_rfc3339("2026-06-11T12:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        weighted_select_questions(
+            score_questions(eligible, now),
+            definition.question_limit,
+            seed,
+        )
+        .into_iter()
+        .map(|question| question.id)
+        .collect()
+    }
+
+    fn insert_completed_attempt(conn: &Connection, attempt_id: &str) {
+        conn.execute(
+            "INSERT INTO test_attempts(id, test_definition_id, test_title, started_at, completed_at,
+             duration_seconds, total_questions, correct_answers, incorrect_answers, unanswered_questions,
+             raw_score, final_score, accuracy_percentage, grade_out_of_10, retry_attempts,
+             retry_correct_answers, retry_incorrect_answers)
+             VALUES (?, 'test-1', 'Test', '2026-06-11T10:00:00Z', '2026-06-11T10:10:00Z',
+             600, 1, 1, 0, 0, 1, 1, 100, 10, 0, 0, 0)",
+            [attempt_id],
+        )
+        .unwrap();
+    }
+
+    fn insert_attempt_answer(
+        conn: &Connection,
+        attempt_id: &str,
+        question_id: &str,
+        retry_number: i64,
+        is_correct: bool,
+        is_unanswered: bool,
+    ) {
+        conn.execute(
+            "INSERT INTO test_attempt_answers(attempt_id, queue_id, source_question_id, retry_number,
+             question_snapshot, selected_option_ids_json, correct_option_ids_json, is_correct,
+             is_unanswered, answered_at)
+             VALUES (?, ?, ?, ?, '{}', '[\"a\"]', '[\"a\"]', ?, ?, '2026-06-11T10:05:00Z')",
+            params![
+                attempt_id,
+                format!("{question_id}-{retry_number}"),
+                question_id,
+                retry_number,
+                is_correct as i64,
+                is_unanswered as i64,
+            ],
+        )
+        .unwrap();
+    }
+
+    fn stats(conn: &Connection, question_id: &str) -> QuestionSelectionStats {
+        load_question_selection_stats(conn, question_id)
+            .unwrap()
+            .unwrap()
+    }
+
+    fn completed_attempt(id: &str, test_id: &str) -> CompletedAttemptDto {
+        CompletedAttemptDto {
+            id: id.into(),
+            test_id: test_id.into(),
+            test_title: "Recovered Test".into(),
+            started_at: "2026-06-11T10:00:00Z".into(),
+            completed_at: "2026-06-11T10:10:00Z".into(),
+            duration_seconds: 300,
+            total_questions: 1,
+            correct_answers: 1,
+            incorrect_answers: 0,
+            unanswered_questions: 0,
+            raw_score: 1.0,
+            final_score: 1.0,
+            accuracy_percentage: 100.0,
+            grade_out_of_10: 10.0,
+            retry_attempts: 0,
+            retry_correct_answers: 0,
+            retry_incorrect_answers: 0,
+            category_results: vec![CategoryAttemptResultDto {
+                category: "Category".into(),
+                correct: 1,
+                incorrect: 0,
+                unanswered: 0,
+                total: 1,
+                accuracy_percentage: 100.0,
+            }],
+        }
+    }
+
+    fn answer_snapshot(
+        question: CollectionQuestionDto,
+        retry_number: i64,
+    ) -> AttemptAnswerSnapshotDto {
+        AttemptAnswerSnapshotDto {
+            queue_id: format!("{}-{retry_number}", question.id),
+            source_question_id: question.id.clone(),
+            retry_number,
+            question,
+            selected_option_ids: vec!["a".into()],
+            correct_option_ids: vec!["a".into()],
+            is_correct: true,
+            is_unanswered: false,
+            answered_at: Some("2026-06-11T10:05:00Z".into()),
         }
     }
 
@@ -1528,6 +1719,423 @@ mod tests {
             stats,
             score: 0.0,
         }
+    }
+
+    #[test]
+    fn saved_test_definitions_persist_all_settings() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        let definition = TestDefinitionDto {
+            id: "definition-1".into(),
+            title: "Mixed categories".into(),
+            question_limit: 42,
+            included_categories: vec!["T2".into(), "T1".into()],
+            included_subcategories: Some(vec!["A2.2012".into(), "A1.2019".into()]),
+            allow_unanswered: true,
+            time_limit_enabled: Some(true),
+            negative_marking_enabled: true,
+            penalty_per_incorrect_answer: 0.33,
+            time_limit_minutes: 90,
+            created_at: "2026-06-11T00:00:00Z".into(),
+            updated_at: "2026-06-11T01:00:00Z".into(),
+        };
+
+        save_test_definition_to_conn(&mut conn, &definition).unwrap();
+        let loaded = load_test_definitions_from_conn(&conn).unwrap();
+
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].id, "definition-1");
+        assert_eq!(loaded[0].title, "Mixed categories");
+        assert_eq!(loaded[0].question_limit, 42);
+        assert_eq!(loaded[0].included_categories, vec!["T1", "T2"]);
+        assert_eq!(
+            loaded[0].included_subcategories,
+            Some(vec!["A1.2019".into(), "A2.2012".into()])
+        );
+        assert!(loaded[0].allow_unanswered);
+        assert_eq!(loaded[0].time_limit_enabled, Some(true));
+        assert_eq!(loaded[0].time_limit_minutes, 90);
+        assert!(loaded[0].negative_marking_enabled);
+        assert_eq!(loaded[0].penalty_per_incorrect_answer, 0.33);
+    }
+
+    #[test]
+    fn active_recovery_save_load_and_clear_works() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        let recovery = ActiveTestRecoveryDto {
+            id: "recovery-1".into(),
+            test_definition: serde_json::json!({
+                "id": "test-1",
+                "title": "Recoverable",
+                "includedCategories": ["T1"]
+            }),
+            active_attempt: serde_json::json!({
+                "id": "active-1",
+                "savedElapsedSeconds": 125,
+                "queue": [{ "sourceQuestionId": "q1", "retryNumber": 0 }]
+            }),
+            saved_at: "2026-06-11T10:05:00Z".into(),
+            app_version: Some("test".into()),
+        };
+
+        save_active_test_attempt_to_conn(&conn, &recovery).unwrap();
+        let loaded = get_active_test_attempt_from_conn(&conn).unwrap().unwrap();
+
+        assert_eq!(loaded.id, "recovery-1");
+        assert_eq!(loaded.test_definition["title"], "Recoverable");
+        assert_eq!(loaded.active_attempt["savedElapsedSeconds"], 125);
+        assert_eq!(loaded.saved_at, "2026-06-11T10:05:00Z");
+        assert_eq!(loaded.app_version.as_deref(), Some("test"));
+
+        clear_active_test_attempt_from_conn(&conn).unwrap();
+        assert!(get_active_test_attempt_from_conn(&conn).unwrap().is_none());
+    }
+
+    #[test]
+    fn finishing_recovered_test_replaces_same_attempt_instead_of_duplicating() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        let question = test_question("q1", "unrated");
+        insert_question(&conn, &question, None).unwrap();
+        let request = SaveCompletedAttemptRequest {
+            attempt: completed_attempt("attempt-1", "test-1"),
+            answers: vec![answer_snapshot(question, 0)],
+        };
+
+        save_completed_attempt_to_conn(&mut conn, &request).unwrap();
+        save_completed_attempt_to_conn(&mut conn, &request).unwrap();
+
+        let attempts = load_attempts(&conn).unwrap();
+        let answer_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM test_attempt_answers", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+
+        assert_eq!(attempts.len(), 1);
+        assert_eq!(attempts[0].id, "attempt-1");
+        assert_eq!(answer_count, 1);
+        assert_eq!(stats(&conn, "q1").exposure_count, 1);
+    }
+
+    #[test]
+    fn load_eligible_questions_matches_t1_only() {
+        let conn = setup_filter_bank();
+        let ids = eligible_ids(&conn, &test_definition(vec!["T1"], None, 10));
+
+        assert_eq!(ids, vec!["t1-a1", "t1-a2", "t1-none"]);
+    }
+
+    #[test]
+    fn load_eligible_questions_matches_t1_a1_2019() {
+        let conn = setup_filter_bank();
+        let ids = eligible_ids(
+            &conn,
+            &test_definition(vec!["T1"], Some(vec!["A1.2019"]), 10),
+        );
+
+        assert_eq!(ids, vec!["t1-a1"]);
+    }
+
+    #[test]
+    fn load_eligible_questions_matches_t1_a2_2012() {
+        let conn = setup_filter_bank();
+        let ids = eligible_ids(
+            &conn,
+            &test_definition(vec!["T1"], Some(vec!["A2.2012"]), 10),
+        );
+
+        assert_eq!(ids, vec!["t1-a2"]);
+    }
+
+    #[test]
+    fn load_eligible_questions_matches_t1_t2_a1_2019() {
+        let conn = setup_filter_bank();
+        let ids = eligible_ids(
+            &conn,
+            &test_definition(vec!["T1", "T2"], Some(vec!["A1.2019"]), 10),
+        );
+
+        assert_eq!(ids, vec!["t1-a1", "t2-a1"]);
+    }
+
+    #[test]
+    fn load_eligible_questions_returns_empty_for_non_matching_subcategory() {
+        let conn = setup_filter_bank();
+        let ids = eligible_ids(
+            &conn,
+            &test_definition(vec!["T2"], Some(vec!["Missing"]), 10),
+        );
+
+        assert!(ids.is_empty());
+    }
+
+    #[test]
+    fn load_eligible_questions_returns_empty_for_empty_result_set() {
+        let conn = setup_filter_bank();
+        let ids = eligible_ids(&conn, &test_definition(vec!["Missing"], None, 10));
+
+        assert!(ids.is_empty());
+    }
+
+    #[test]
+    fn load_eligible_questions_excludes_uncategorized_when_subcategory_filter_selected() {
+        let conn = setup_filter_bank();
+        let ids = eligible_ids(
+            &conn,
+            &test_definition(vec!["T1"], Some(vec!["A1.2019"]), 10),
+        );
+
+        assert!(!ids.contains(&"t1-none".into()));
+    }
+
+    #[test]
+    fn load_eligible_questions_regresses_t1_a1_without_cross_filter_leaks() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        for question in [
+            test_question_with_filter("expected", "unrated", "T1", Some("A1.2019")),
+            test_question_with_filter("wrong-same-category", "unrated", "T1", Some("A2.2012")),
+            test_question_with_filter("wrong-other-category", "unrated", "T2", Some("A2.2012")),
+        ] {
+            insert_question(&conn, &question, None).unwrap();
+        }
+
+        let ids = eligible_ids(
+            &conn,
+            &test_definition(vec!["T1"], Some(vec!["A1.2019"]), 10),
+        );
+
+        assert_eq!(ids, vec!["expected"]);
+    }
+
+    #[test]
+    fn generated_questions_respect_filters_and_avoid_duplicates() {
+        let conn = setup_filter_bank();
+        let definition = test_definition(vec!["T1", "T2"], Some(vec!["A1.2019"]), 10);
+        let ids = generated_ids(&conn, &definition, 42);
+        let unique_ids = ids.iter().collect::<std::collections::HashSet<_>>();
+
+        assert_eq!(ids.len(), 2);
+        assert_eq!(unique_ids.len(), ids.len());
+        assert!(ids.iter().all(|id| id == "t1-a1" || id == "t2-a1"));
+    }
+
+    #[test]
+    fn smart_selection_never_selects_out_of_filter_questions_with_better_scores() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        for question in [
+            test_question_with_filter("in-filter", "low", "T1", Some("A1.2019")),
+            test_question_with_filter("out-category", "high", "T2", Some("A1.2019")),
+            test_question_with_filter("out-subcategory", "high", "T1", Some("A2.2012")),
+        ] {
+            insert_question(&conn, &question, None).unwrap();
+        }
+        conn.execute(
+            "UPDATE questions
+             SET exposure_count = 10,
+                 original_answer_count = 10,
+                 original_correct_count = 10,
+                 original_incorrect_count = 0,
+                 last_seen_at = '2026-06-11T12:00:00Z'
+             WHERE id = 'in-filter'",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE questions
+             SET exposure_count = 0,
+                 original_answer_count = 10,
+                 original_correct_count = 0,
+                 original_incorrect_count = 10,
+                 last_seen_at = '2026-01-01T12:00:00Z'
+             WHERE id IN ('out-category', 'out-subcategory')",
+            [],
+        )
+        .unwrap();
+
+        let definition = test_definition(vec!["T1"], Some(vec!["A1.2019"]), 1);
+        let ids = generated_ids(&conn, &definition, 7);
+
+        assert_eq!(ids, vec!["in-filter"]);
+    }
+
+    #[test]
+    fn completed_original_questions_increment_exposure_and_seen_stats() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        insert_question(&conn, &test_question("q1", "unrated"), None).unwrap();
+        insert_completed_attempt(&conn, "attempt-1");
+        insert_attempt_answer(&conn, "attempt-1", "q1", 0, true, false);
+
+        rebuild_question_selection_stats(&conn).unwrap();
+        let stats = stats(&conn, "q1");
+
+        assert_eq!(stats.exposure_count, 1);
+        assert_eq!(stats.original_answer_count, 1);
+        assert_eq!(stats.original_correct_count, 1);
+        assert_eq!(stats.original_incorrect_count, 0);
+        assert_eq!(stats.last_seen_at.as_deref(), Some("2026-06-11T10:05:00Z"));
+    }
+
+    #[test]
+    fn retry_questions_do_not_increment_exposure_or_seen_stats() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        insert_question(&conn, &test_question("q1", "unrated"), None).unwrap();
+        insert_completed_attempt(&conn, "attempt-1");
+        insert_attempt_answer(&conn, "attempt-1", "q1", 1, false, false);
+
+        rebuild_question_selection_stats(&conn).unwrap();
+        let stats = stats(&conn, "q1");
+
+        assert_eq!(stats.exposure_count, 0);
+        assert_eq!(stats.original_answer_count, 0);
+        assert_eq!(stats.original_correct_count, 0);
+        assert_eq!(stats.original_incorrect_count, 0);
+        assert_eq!(stats.last_seen_at, None);
+    }
+
+    #[test]
+    fn active_recovery_without_completed_attempt_does_not_increment_exposure() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        insert_question(&conn, &test_question("q1", "unrated"), None).unwrap();
+        conn.execute(
+            "INSERT INTO active_test_attempts(id, test_definition_snapshot, active_attempt_snapshot, saved_at, app_version)
+             VALUES ('active-1', '{}', '{}', '2026-06-11T10:05:00Z', 'test')",
+            [],
+        )
+        .unwrap();
+
+        rebuild_question_selection_stats(&conn).unwrap();
+        let stats = stats(&conn, "q1");
+
+        assert_eq!(stats.exposure_count, 0);
+        assert_eq!(stats.original_answer_count, 0);
+        assert_eq!(stats.last_seen_at, None);
+    }
+
+    #[test]
+    fn deleting_completed_attempts_rebuilds_exposure_stats_to_zero() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        insert_question(&conn, &test_question("q1", "unrated"), None).unwrap();
+        insert_completed_attempt(&conn, "attempt-1");
+        insert_attempt_answer(&conn, "attempt-1", "q1", 0, false, false);
+        rebuild_question_selection_stats(&conn).unwrap();
+        assert_eq!(stats(&conn, "q1").exposure_count, 1);
+
+        conn.execute("DELETE FROM test_attempts", []).unwrap();
+        rebuild_question_selection_stats(&conn).unwrap();
+        let stats = stats(&conn, "q1");
+
+        assert_eq!(stats.exposure_count, 0);
+        assert_eq!(stats.original_answer_count, 0);
+        assert_eq!(stats.original_correct_count, 0);
+        assert_eq!(stats.original_incorrect_count, 0);
+        assert_eq!(stats.last_seen_at, None);
+    }
+
+    #[test]
+    fn newly_imported_questions_start_with_zero_exposure_and_are_prioritized() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        insert_question(
+            &conn,
+            &test_question_with_filter("seen", "high", "T1", Some("A1.2019")),
+            None,
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE questions
+             SET exposure_count = 8,
+                 original_answer_count = 8,
+                 original_correct_count = 8,
+                 last_seen_at = '2026-06-11T09:00:00Z'
+             WHERE id = 'seen'",
+            [],
+        )
+        .unwrap();
+
+        insert_question(
+            &conn,
+            &test_question_with_filter("new", "low", "T1", Some("A1.2019")),
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(stats(&conn, "new").exposure_count, 0);
+        let ids = generated_ids(
+            &conn,
+            &test_definition(vec!["T1"], Some(vec!["A1.2019"]), 1),
+            99,
+        );
+
+        assert_eq!(ids, vec!["new"]);
+    }
+
+    #[test]
+    fn unseen_in_filter_questions_are_prioritized_over_high_exposure_in_filter_questions() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        for question in [
+            test_question_with_filter("unseen", "low", "T1", Some("A1.2019")),
+            test_question_with_filter("seen", "high", "T1", Some("A1.2019")),
+        ] {
+            insert_question(&conn, &question, None).unwrap();
+        }
+        conn.execute(
+            "UPDATE questions
+             SET exposure_count = 12,
+                 original_answer_count = 12,
+                 original_incorrect_count = 12,
+                 last_seen_at = '2026-06-01T09:00:00Z'
+             WHERE id = 'seen'",
+            [],
+        )
+        .unwrap();
+
+        let ids = generated_ids(
+            &conn,
+            &test_definition(vec!["T1"], Some(vec!["A1.2019"]), 1),
+            11,
+        );
+
+        assert_eq!(ids, vec!["unseen"]);
+    }
+
+    #[test]
+    fn smart_selection_excludes_out_of_filter_unseen_questions() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        for question in [
+            test_question_with_filter("eligible-seen", "high", "T1", Some("A1.2019")),
+            test_question_with_filter("out-category-unseen", "low", "T2", Some("A1.2019")),
+            test_question_with_filter("out-subcategory-unseen", "low", "T1", Some("A2.2012")),
+        ] {
+            insert_question(&conn, &question, None).unwrap();
+        }
+        conn.execute(
+            "UPDATE questions
+             SET exposure_count = 20,
+                 original_answer_count = 20,
+                 original_incorrect_count = 20,
+                 last_seen_at = '2026-06-11T09:00:00Z'
+             WHERE id = 'eligible-seen'",
+            [],
+        )
+        .unwrap();
+
+        let ids = generated_ids(
+            &conn,
+            &test_definition(vec!["T1"], Some(vec!["A1.2019"]), 1),
+            21,
+        );
+
+        assert_eq!(ids, vec!["eligible-seen"]);
     }
 
     #[test]
@@ -1707,9 +2315,11 @@ mod tests {
         let migration_exists = has_migration(&conn, 2).unwrap();
         let shuffle_migration_exists = has_migration(&conn, 3).unwrap();
         let shuffle_options: i64 = conn
-            .query_row("SELECT shuffle_options FROM questions WHERE id = 'q1'", [], |row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT shuffle_options FROM questions WHERE id = 'q1'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap();
         let index_exists: bool = conn
             .query_row(

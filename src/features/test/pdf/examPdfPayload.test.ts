@@ -69,6 +69,17 @@ describe("exam PDF payload", () => {
     expect(payload.questions[1].number).toBe(2);
   });
 
+  it("preserves shuffleOptions false option order in the payload", () => {
+    const payload = buildExamPdfPayload({
+      definition,
+      runtimeQuestions,
+      generatedAt: "2026-06-10T12:00:00.000Z",
+    });
+
+    expect(payload.questions[0].shuffleOptions).toBe(false);
+    expect(payload.questions[0].options.map((option) => option.id)).toEqual(["b", "c", "a"]);
+  });
+
   it("builds answer key from visible option labels", () => {
     const payload = buildExamPdfPayload({
       definition,
@@ -127,6 +138,33 @@ describe("exam PDF payload", () => {
     expect(payload.metadata.allowUnanswered).toBe("No");
   });
 
+  it("summarizes more than four categories and subcategories", () => {
+    const payload = buildExamPdfPayload({
+      definition,
+      runtimeQuestions: [
+        { ...runtimeQuestions[0], id: "q1", questionCategory: "T5", questionSubcategory: "A5" },
+        { ...runtimeQuestions[0], id: "q2", questionCategory: "T1", questionSubcategory: "A1" },
+        { ...runtimeQuestions[0], id: "q3", questionCategory: "T3", questionSubcategory: "A3" },
+        { ...runtimeQuestions[0], id: "q4", questionCategory: "T2", questionSubcategory: "A2" },
+        { ...runtimeQuestions[0], id: "q5", questionCategory: "T4", questionSubcategory: "A4" },
+      ],
+      generatedAt: "2026-06-10T12:00:00.000Z",
+    });
+
+    expect(payload.metadata.categorySummary).toBe("T1, T2, T3, T4 +1 más");
+    expect(payload.metadata.subcategorySummary).toBe("A1, A2, A3, A4 +1 más");
+  });
+
+  it("uses legacy positive time limits when the enabled flag is absent", () => {
+    const payload = buildExamPdfPayload({
+      definition: { ...definition, timeLimitEnabled: undefined, timeLimitMinutes: 45 },
+      runtimeQuestions,
+      generatedAt: "2026-06-10T12:00:00.000Z",
+    });
+
+    expect(payload.metadata.timeLimit).toBe("45 minutos");
+  });
+
   it("supports answer sheet chunking and option labels", () => {
     expect(
       chunkItems(
@@ -137,6 +175,8 @@ describe("exam PDF payload", () => {
     expect(getOptionLabel(0)).toBe("A");
     expect(getOptionLabel(25)).toBe("Z");
     expect(getOptionLabel(26)).toBe("AA");
+    expect(getOptionLabel(51)).toBe("AZ");
+    expect(getOptionLabel(52)).toBe("BA");
   });
 
   it("does not mutate runtime questions or analytics-like source data", () => {
@@ -158,5 +198,14 @@ describe("exam PDF payload", () => {
     expect(buildPdfFileName({ ...definition, title: "A/B: C?" }, "2026-06-10T12:00:00.000Z")).toBe(
       "testlytic-a-b-c-2026-06-10.pdf",
     );
+  });
+
+  it("falls back to test when the title is blank or only invalid filename characters", () => {
+    expect(buildPdfFileName({ ...definition, title: "   " }, "2026-06-10T12:00:00.000Z")).toBe(
+      "testlytic-test-2026-06-10.pdf",
+    );
+    expect(
+      buildPdfFileName({ ...definition, title: '<>:"/\\|?*' }, "2026-06-10T12:00:00.000Z"),
+    ).toBe("testlytic-test-2026-06-10.pdf");
   });
 });
