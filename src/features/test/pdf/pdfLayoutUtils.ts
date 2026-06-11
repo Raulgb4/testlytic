@@ -1,5 +1,7 @@
 import { RuntimeQuestion, TestDefinition } from "../testTypes";
 
+export const ANSWER_ROWS_PER_PAGE = 32;
+
 export function getOptionLabel(index: number) {
   let value = index;
   let label = "";

@@ -159,7 +159,7 @@ export function AppShell({
             />
           ) : null}
           {section === "analytics" ? (
-            <AnalyticsSection t={t} completedAttempts={completedAttempts} />
+            <AnalyticsSection t={t} completedAttempts={completedAttempts} collection={collection} />
           ) : null}
           {section === "settings" ? (
             <SettingsSection

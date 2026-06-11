@@ -1,9 +1,8 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { ExamPdfAnswerKeyItem, ExamPdfPayload } from "./examPdfTypes";
-import { chunkItems, getOptionLabel } from "./pdfLayoutUtils";
+import { ANSWER_ROWS_PER_PAGE, chunkItems, getOptionLabel } from "./pdfLayoutUtils";
 
 const PAGE_MARGIN = 36;
-const ANSWER_ROWS_PER_PAGE = 42;
 const SOLUTION_ROWS_PER_PAGE = 72;
 
 const styles = StyleSheet.create({
@@ -97,9 +96,22 @@ const styles = StyleSheet.create({
     borderBottomColor: "#cccccc",
   },
   questionText: {
+    flex: 1,
     fontSize: 10.5,
+    fontWeight: 700,
     lineHeight: 1.35,
+  },
+  questionPromptRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
     marginBottom: 5,
+  },
+  questionNumber: {
+    width: 34,
+    paddingRight: 8,
+    fontSize: 10.5,
+    fontWeight: 700,
+    lineHeight: 1.35,
   },
   auxiliary: {
     fontSize: 9,
@@ -124,14 +136,69 @@ const styles = StyleSheet.create({
   answerSheetHeader: {
     borderWidth: 1,
     borderColor: "#111111",
-    padding: 8,
+    padding: 7,
     marginBottom: 12,
   },
-  identityLine: {
+  answerSheetTitle: {
+    fontSize: 11,
+    fontWeight: 700,
+    textAlign: "center",
+    marginBottom: 7,
+  },
+  formRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-    fontSize: 9,
+    marginBottom: 6,
+  },
+  formField: {
+    flex: 1,
+    marginRight: 6,
+  },
+  formFieldWide: {
+    flex: 1.4,
+    marginRight: 6,
+  },
+  formFieldLabel: {
+    fontSize: 7,
+    fontWeight: 700,
+    marginBottom: 2,
+    textTransform: "uppercase",
+  },
+  formFieldBlank: {
+    height: 18,
+    borderWidth: 1,
+    borderColor: "#111111",
+  },
+  signatureBlank: {
+    height: 28,
+    borderWidth: 1,
+    borderColor: "#111111",
+  },
+  accessField: {
+    flex: 2.2,
+    marginRight: 6,
+  },
+  accessOptions: {
+    minHeight: 18,
+    borderWidth: 1,
+    borderColor: "#111111",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+  },
+  accessOption: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  accessBox: {
+    width: 7,
+    height: 7,
+    borderWidth: 1,
+    borderColor: "#111111",
+    marginRight: 3,
+  },
+  accessLabel: {
+    fontSize: 7,
+    marginRight: 10,
   },
   answerTable: {
     borderTopWidth: 1,
@@ -196,30 +263,84 @@ function PageFooter({ title }: { title: string }) {
   return (
     <View style={styles.footer} fixed>
       <Text>{title}</Text>
-      <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} / ${totalPages}`} />
+      <Text render={({ pageNumber, totalPages }) => `Página ${pageNumber} / ${totalPages}`} />
+    </View>
+  );
+}
+
+function FormField({ label, wide = false }: { label: string; wide?: boolean }) {
+  return (
+    <View style={wide ? styles.formFieldWide : styles.formField}>
+      <Text style={styles.formFieldLabel}>{label}</Text>
+      <View style={styles.formFieldBlank} />
+    </View>
+  );
+}
+
+function AccessField() {
+  const options = ["Promoción interna", "Libre", "Discapacidad"];
+  return (
+    <View style={styles.accessField}>
+      <Text style={styles.formFieldLabel}>Acceso</Text>
+      <View style={styles.accessOptions}>
+        {options.map((option) => (
+          <View key={option} style={styles.accessOption}>
+            <View style={styles.accessBox} />
+            <Text style={styles.accessLabel}>{option}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function AnswerSheetForm() {
+  return (
+    <View style={styles.answerSheetHeader}>
+      <Text style={styles.answerSheetTitle}>HOJA DE RESPUESTAS</Text>
+      <View style={styles.formRow}>
+        <FormField label="1º apellido" />
+        <FormField label="2º apellido" />
+        <FormField label="Nombre" />
+      </View>
+      <View style={styles.formRow}>
+        <FormField label="Convocatoria" />
+        <FormField label="Ejercicio" />
+        <FormField label="Localidad" />
+      </View>
+      <View style={styles.formRow}>
+        <AccessField />
+        <FormField label="DNI" />
+      </View>
+      <View style={styles.formRow}>
+        <View style={styles.formFieldWide}>
+          <Text style={styles.formFieldLabel}>Firma</Text>
+          <View style={styles.signatureBlank} />
+        </View>
+      </View>
     </View>
   );
 }
 
 function CoverPage({ payload }: { payload: ExamPdfPayload }) {
   const metadataRows = [
-    ["Generated", new Date(payload.generatedAt).toLocaleString()],
-    ["Questions", String(payload.metadata.questionCount)],
-    ["Categories", payload.metadata.categorySummary],
-    ["Subcategories", payload.metadata.subcategorySummary],
-    ["Time limit", payload.metadata.timeLimit],
-    ["Negative marking", payload.metadata.negativeMarking],
-    ["Allow unanswered", payload.metadata.allowUnanswered],
+    ["Generado", new Date(payload.generatedAt).toLocaleString()],
+    ["Preguntas", String(payload.metadata.questionCount)],
+    ["Categorías", payload.metadata.categorySummary],
+    ["Subcategorías", payload.metadata.subcategorySummary],
+    ["Tiempo límite", payload.metadata.timeLimit],
+    ["Penalización", payload.metadata.negativeMarking],
+    ["Permite sin responder", payload.metadata.allowUnanswered],
   ];
 
   return (
     <Page size="A4" style={styles.page}>
       <Text style={styles.coverTitle}>{payload.definition.title}</Text>
       <Text style={styles.coverSubtitle}>
-        Printable opposition exam generated locally by Testlytic
+        Test de oposición imprimible generado localmente por Testlytic
       </Text>
 
-      <Text style={styles.sectionTitle}>Exam Information</Text>
+      <Text style={styles.sectionTitle}>Información del test</Text>
       <View style={styles.metadataGrid}>
         {metadataRows.map(([label, value], index) => (
           <View
@@ -232,14 +353,14 @@ function CoverPage({ payload }: { payload: ExamPdfPayload }) {
         ))}
       </View>
 
-      <Text style={styles.sectionTitle}>General Instructions</Text>
+      <Text style={styles.sectionTitle}>Instrucciones generales</Text>
       <Text style={styles.instructions}>
-        Read every question carefully before answering. Mark answers clearly on the answer sheet.
-        Wrong answers may apply the configured penalty. Reserve time to review your answers and
-        transfer them cleanly. This PDF export does not start a Testlytic session and does not
-        affect analytics or exposure counts.
+        Lea atentamente cada pregunta antes de responder. Marque las respuestas con claridad en la
+        hoja de respuestas. Las respuestas incorrectas pueden aplicar la penalización configurada.
+        Reserve tiempo para revisar y trasladar sus respuestas limpiamente. Esta exportación PDF no
+        inicia una sesión de Testlytic ni afecta a estadísticas o recuentos de exposición.
       </Text>
-      <PageFooter title="Testlytic PDF Export" />
+      <PageFooter title="Exportación PDF de Testlytic" />
     </Page>
   );
 }
@@ -249,13 +370,14 @@ function ExamPages({ payload }: { payload: ExamPdfPayload }) {
     <Page size="A4" style={styles.page} wrap>
       <View style={styles.header} fixed>
         <Text>{payload.definition.title}</Text>
-        <Text>Exam Questions</Text>
+        <Text>Preguntas</Text>
       </View>
       {payload.questions.map((question) => (
         <View key={`${question.id}-${question.number}`} style={styles.questionBlock} wrap={false}>
-          <Text style={styles.questionText}>
-            {question.number}. {question.question}
-          </Text>
+          <View style={styles.questionPromptRow}>
+            <Text style={styles.questionNumber}>{question.number}.</Text>
+            <Text style={styles.questionText}>{question.question}</Text>
+          </View>
           {question.auxiliaryInformation ? (
             <Text style={styles.auxiliary}>{question.auxiliaryInformation}</Text>
           ) : null}
@@ -267,7 +389,7 @@ function ExamPages({ payload }: { payload: ExamPdfPayload }) {
           ))}
         </View>
       ))}
-      <PageFooter title="Exam Questions" />
+      <PageFooter title="Preguntas" />
     </Page>
   );
 }
@@ -284,18 +406,12 @@ function AnswerSheetPages({ payload }: { payload: ExamPdfPayload }) {
         <Page key={`answer-${pageIndex}`} size="A4" style={styles.page}>
           <View style={styles.header} fixed>
             <Text>{payload.definition.title}</Text>
-            <Text>Answer Sheet</Text>
+            <Text>Hoja de respuestas</Text>
           </View>
-          <View style={styles.answerSheetHeader}>
-            <Text>ANSWER SHEET</Text>
-            <View style={styles.identityLine}>
-              <Text>Name: ____________________________________</Text>
-              <Text>Date: __________________</Text>
-            </View>
-          </View>
+          <AnswerSheetForm />
           <View style={styles.answerTable}>
             <View style={styles.answerRow}>
-              <Text style={styles.answerNumber}>No.</Text>
+              <Text style={styles.answerNumber}>Nº</Text>
               {labels.map((label) => (
                 <View key={label} style={styles.bubbleCell}>
                   <Text style={styles.bubbleLabel}>{label}</Text>
@@ -319,7 +435,7 @@ function AnswerSheetPages({ payload }: { payload: ExamPdfPayload }) {
               </View>
             ))}
           </View>
-          <PageFooter title="Answer Sheet" />
+          <PageFooter title="Hoja de respuestas" />
         </Page>
       ))}
     </>
@@ -334,9 +450,9 @@ function SolutionPages({ payload }: { payload: ExamPdfPayload }) {
         <Page key={`solutions-${pageIndex}`} size="A4" style={styles.page}>
           <View style={styles.header} fixed>
             <Text>{payload.definition.title}</Text>
-            <Text>Solutions</Text>
+            <Text>Soluciones</Text>
           </View>
-          <Text style={styles.sectionTitle}>Answer Key</Text>
+          <Text style={styles.sectionTitle}>Plantilla de respuestas</Text>
           <View style={styles.solutionGrid}>
             {items.map((item: ExamPdfAnswerKeyItem) => (
               <Text key={item.questionNumber} style={styles.solutionItem}>
@@ -344,7 +460,7 @@ function SolutionPages({ payload }: { payload: ExamPdfPayload }) {
               </Text>
             ))}
           </View>
-          <PageFooter title="Solutions" />
+          <PageFooter title="Soluciones" />
         </Page>
       ))}
     </>
@@ -353,7 +469,11 @@ function SolutionPages({ payload }: { payload: ExamPdfPayload }) {
 
 export function ExamPdfDocument({ payload }: { payload: ExamPdfPayload }) {
   return (
-    <Document title={payload.definition.title} author="Testlytic" subject="Printable exam export">
+    <Document
+      title={payload.definition.title}
+      author="Testlytic"
+      subject="Exportación PDF imprimible"
+    >
       <CoverPage payload={payload} />
       <ExamPages payload={payload} />
       <AnswerSheetPages payload={payload} />

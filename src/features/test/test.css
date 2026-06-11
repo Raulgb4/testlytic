@@ -329,6 +329,15 @@
   min-width: 0;
 }
 
+.delete-test-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
 .test-runner-full {
   width: 100%;
   max-width: none;

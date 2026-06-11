@@ -1246,7 +1246,7 @@ export function TestSection({
           <div className="settings-modal" role="dialog" aria-modal="true">
             <h3>{t("test.deleteTestConfirmTitle")}</h3>
             <p>{t("test.deleteTestConfirmBody", { title: deleteTarget.title })}</p>
-            <div className="settings-modal-actions">
+            <div className="delete-test-confirm-actions">
               <Button
                 onClick={() => {
                   onDeleteDefinition(deleteTarget);

@@ -7,9 +7,9 @@ function uniqueSorted(values: Array<string | undefined>) {
 }
 
 function summarizeList(values: string[]) {
-  if (values.length === 0) return "All";
+  if (values.length === 0) return "Todas";
   if (values.length <= 4) return values.join(", ");
-  return `${values.slice(0, 4).join(", ")} +${values.length - 4} more`;
+  return `${values.slice(0, 4).join(", ")} +${values.length - 4} más`;
 }
 
 export function buildExamPdfPayload({
@@ -41,12 +41,12 @@ export function buildExamPdfPayload({
       generatedAt,
       questionCount: runtimeQuestions.length,
       categorySummary: summarizeList(categories),
-      subcategorySummary: subcategories.length > 0 ? summarizeList(subcategories) : "None",
-      timeLimit: effectiveTimeLimit > 0 ? `${effectiveTimeLimit} minutes` : "No time limit",
+      subcategorySummary: subcategories.length > 0 ? summarizeList(subcategories) : "Ninguna",
+      timeLimit: effectiveTimeLimit > 0 ? `${effectiveTimeLimit} minutos` : "Sin límite de tiempo",
       negativeMarking: definition.negativeMarkingEnabled
-        ? `Penalty ${definition.penaltyPerIncorrectAnswer} per incorrect answer`
-        : "Disabled",
-      allowUnanswered: definition.allowUnanswered ? "Yes" : "No",
+        ? `Penalización de ${definition.penaltyPerIncorrectAnswer} por respuesta incorrecta`
+        : "Desactivada",
+      allowUnanswered: definition.allowUnanswered ? "Sí" : "No",
     },
   };
 }
