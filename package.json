@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "rust:format:check": "cargo fmt --check --manifest-path src-tauri/Cargo.toml",
+    "rust:clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings",
+    "validate": "pnpm run format:check && pnpm run typecheck && pnpm test && pnpm run build && pnpm run rust:format:check && pnpm run rust:clippy"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",

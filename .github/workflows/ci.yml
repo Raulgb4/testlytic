@@ -11,16 +11,18 @@ on:
       - develop
 
 jobs:
-  checks:
+  validate:
+    name: Validate
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          run_install: false
+          version: 11.1.2
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -29,19 +31,19 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install frontend dependencies
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Format check
+      - name: Check formatting
         run: pnpm run format:check
 
-      - name: Type check
+      - name: Typecheck
         run: pnpm run typecheck
 
-      - name: Unit tests
-        run: pnpm run test
+      - name: Test
+        run: pnpm test
 
-      - name: Frontend build
+      - name: Build
         run: pnpm run build
 
       - name: Setup Rust
@@ -58,9 +60,7 @@ jobs:
             patchelf
 
       - name: Rust format check
-        run: cargo fmt --check
-        working-directory: src-tauri
+        run: pnpm run rust:format:check
 
       - name: Rust clippy
-        run: cargo clippy -- -D warnings
-        working-directory: src-tauri
+        run: pnpm run rust:clippy

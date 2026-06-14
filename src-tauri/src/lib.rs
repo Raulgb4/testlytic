@@ -566,13 +566,7 @@ fn rebuild_question_selection_stats(conn: &Connection) -> rusqlite::Result<()> {
 }
 
 fn fingerprint_question(question: &CollectionQuestionDto) -> String {
-    let normalize = |value: &str| {
-        value
-            .trim()
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ")
-    };
+    let normalize = |value: &str| value.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut correct_options = question.correct_options.clone();
     correct_options.sort();
     let options = question

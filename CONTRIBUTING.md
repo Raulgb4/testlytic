@@ -92,14 +92,24 @@ Keep commits focused and easy to review.
 
 ## Validation Before Pull Request
 
-Run the following commands before creating a pull request:
+Run the same frontend quality gates used by GitHub CI before creating a pull request:
+
+```bash
+pnpm run validate
+```
+
+The validation command runs:
 
 ```bash
 pnpm run format:check
 pnpm run typecheck
-pnpm run test
+pnpm test
 pnpm run build
+pnpm run rust:format:check
+pnpm run rust:clippy
 ```
+
+GitHub CI installs dependencies with `pnpm install --frozen-lockfile` and then runs the same gates.
 
 When runtime or desktop behavior changes, also verify:
 
