@@ -4,13 +4,13 @@ import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
 import { Toast } from "../../shared/components/Toast";
 import { ActiveTestRecovery } from "../../services/persistence";
-import { MetricLine } from "./components/MetricLine";
 import { DeleteTestDefinitionModal } from "./definition/DeleteTestDefinitionModal";
 import { SavedTestsList } from "./definition/SavedTestsList";
 import { TestDefinitionFormModal, TestFormState } from "./definition/TestDefinitionFormModal";
 import { CollectionQuestion, DifficultyLevel, QuestionCollection } from "./questionCollectionTypes";
 import { RecoveryModal } from "./recovery/RecoveryModal";
 import { TestResultsView } from "./results/TestResultsView";
+import { TestRunnerView } from "./runner/TestRunnerView";
 import {
   ActiveTestAttempt,
   CompletedTestAttempt,
@@ -631,215 +631,46 @@ export function TestSection({
         : `${t("test.rateDifficulty")} (${getDifficultyLabel(currentDifficulty)})`;
 
     return (
-      <div className="test-runner-full">
-        <section
-          className={`test-exam-header time-${timeUrgency}`}
-          aria-label={t("test.activeTitle")}
-        >
-          <div className="test-exam-header-main">
-            <div className="test-exam-title-block">
-              <h3>{activeDefinition?.title || t("test.activeTitle")}</h3>
-              <p>{visibleCategory}</p>
-            </div>
-            <div
-              className="test-exam-grade"
-              aria-label={`${t("test.statusGrade")} ${originalCounters.gradeOutOf10.toFixed(1)} / 10`}
-            >
-              <span>{t("test.statusGrade")}</span>
-              <strong>{originalCounters.gradeOutOf10.toFixed(1)} / 10</strong>
-            </div>
-          </div>
-
-          <div className="test-exam-stats">
-            <MetricLine
-              label={t("test.statusQuestion")}
-              value={`${visibleQuestionPosition}/${activeAttempt.originalQuestionCount}`}
-            />
-            <MetricLine
-              label={t("test.statusAnswered")}
-              value={`${originalCounters.answered}/${originalCounters.total}`}
-            />
-            <MetricLine label={t("test.statusCorrect")} value={String(originalCounters.correct)} />
-            <MetricLine label={t("test.statusWrong")} value={String(originalCounters.wrong)} />
-            <MetricLine label={t("test.statusElapsed")} value={formatDuration(elapsedSeconds)} />
-            <MetricLine
-              label={t("test.statusLimit")}
-              value={
-                activeDefinition && effectiveTimeLimitMinutes > 0
-                  ? t("test.limitMinutes", { minutes: effectiveTimeLimitMinutes })
-                  : t("test.noTimeLimit")
-              }
-              className={timeUrgency === "normal" ? undefined : "time-metric"}
-            />
-          </div>
-        </section>
-
-        <Card
-          title={t("test.questionTitle", { number: activeAttempt.currentQueueIndex + 1 })}
-          className="test-runner-card"
-        >
-          <div className="runner-card-toolbar">
-            <button
-              type="button"
-              className="runner-difficulty-button"
-              onClick={() => openDifficultyModal(currentQueueItem)}
-              aria-label={difficultyButtonLabel}
-              title={difficultyButtonLabel}
-            >
-              <span aria-hidden="true">i</span>
-            </button>
-          </div>
-          <p className="runner-question">{currentQuestion.question}</p>
-          {currentQuestion.auxiliaryInformation ? (
-            <p className="runner-note">{currentQuestion.auxiliaryInformation}</p>
-          ) : null}
-          <div className="runner-options" role="group" aria-label={t("test.answerOptions")}>
-            {currentQuestion.options.map((option, optionIndex) => {
-              const selected =
-                currentDraft.includes(option.id) ||
-                currentAnswer?.selectedOptionIds.includes(option.id) ||
-                false;
-              const hasAnswer = hasSubmittedCurrentAnswer;
-              const isCorrectOption = currentQuestion.correctOptions.includes(option.id);
-              let className = "runner-option";
-              if (selected) className += " selected";
-              if (hasAnswer) {
-                if (isCorrectOption) className += " correct";
-                if (selected && !isCorrectOption) className += " incorrect";
-              }
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={className}
-                  onClick={() => selectDraftAnswer(currentQueueItem, option.id)}
-                  disabled={completionInFlightRef.current}
-                >
-                  <span className="option-key">{getVisibleOptionLabel(optionIndex)}</span>
-                  <span>{option.text}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {hasSubmittedCurrentAnswer && answerExplanation ? (
-            <div className="runner-explanation" aria-live="polite">
-              <p className="runner-explanation-title">{t("test.explanation")}</p>
-              <p className="runner-explanation-body">{answerExplanation}</p>
-            </div>
-          ) : null}
-
-          <div className="test-runner-footer">
-            <div className="test-runner-footer-main">
-              {activeAttempt.currentQueueIndex > 0 ? (
-                <Button variant="secondary" onClick={goToPreviousQuestion}>
-                  {t("test.previous")}
-                </Button>
-              ) : null}
-              {showAnswer ? (
-                <Button onClick={submitCurrentAnswer}>{t("test.answer")}</Button>
-              ) : null}
-              {showNext ? (
-                <Button variant="secondary" onClick={goToNextQuestion}>
-                  {t("test.next")}
-                </Button>
-              ) : null}
-            </div>
-            <div className="test-runner-finish-action">
-              <button type="button" className="btn btn-danger" onClick={requestFinishConfirmation}>
-                {t("test.finish")}
-              </button>
-            </div>
-          </div>
-        </Card>
-        {finishWarning ? (
-          <p className="field-error runner-finish-warning">{finishWarning}</p>
-        ) : null}
-        {finishConfirmOpen && finishSummary ? (
-          <div className="settings-modal-backdrop" role="presentation">
-            <div className="settings-modal finish-confirm-modal" role="dialog" aria-modal="true">
-              <h3>{t("test.finishConfirmTitle")}</h3>
-              <p>{t("test.finishConfirmBody")}</p>
-              <div className="finish-confirm-summary">
-                <MetricLine
-                  label={t("test.statusAnswered")}
-                  value={String(finishSummary.answered)}
-                />
-                <MetricLine
-                  label={t("test.kpiUnanswered")}
-                  value={String(finishSummary.unanswered)}
-                />
-                <MetricLine label={t("test.statusCorrect")} value={String(finishSummary.correct)} />
-                <MetricLine label={t("test.statusWrong")} value={String(finishSummary.incorrect)} />
-              </div>
-              {!allowUnanswered && finishSummary.unanswered > 0 ? (
-                <p className="field-error finish-confirm-blocked">
-                  {t("test.finishConfirmBlocked", { count: finishSummary.unanswered })}
-                </p>
-              ) : null}
-              <div className="settings-modal-actions finish-confirm-actions">
-                <Button variant="secondary" onClick={() => setFinishConfirmOpen(false)}>
-                  {t("test.cancel")}
-                </Button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  onClick={() => completeActiveTest("manual")}
-                  disabled={!allowUnanswered && finishSummary.unanswered > 0}
-                >
-                  {t("test.finishConfirmAction")}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {difficultyModalOpen && difficultyTarget ? (
-          <div className="settings-modal-backdrop" role="presentation">
-            <div
-              className="settings-modal difficulty-modal"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="difficulty-modal-title"
-            >
-              <h3 id="difficulty-modal-title">{t("test.difficultyModalTitle")}</h3>
-              <p>{t("test.difficultyModalBody")}</p>
-              <div className="difficulty-modal-question">{difficultyTarget.questionText}</div>
-
-              <fieldset className={`difficulty-selector difficulty-${difficultySelection}`}>
-                <legend>{t("test.rateDifficulty")}</legend>
-                <span className="difficulty-selector-thumb" aria-hidden="true" />
-                {DIFFICULTY_OPTIONS.map((option) => (
-                  <label
-                    key={option.value}
-                    className={
-                      difficultySelection === option.value
-                        ? "difficulty-selector-option selected"
-                        : "difficulty-selector-option"
-                    }
-                  >
-                    <input
-                      type="radio"
-                      name="question-difficulty"
-                      value={option.value}
-                      checked={difficultySelection === option.value}
-                      onChange={() => setDifficultySelection(option.value)}
-                    />
-                    <span>{t(option.labelKey)}</span>
-                  </label>
-                ))}
-              </fieldset>
-
-              <div className="settings-modal-actions difficulty-modal-actions">
-                <Button variant="secondary" onClick={closeDifficultyModal}>
-                  {t("test.cancel")}
-                </Button>
-                <Button onClick={saveQuestionDifficulty}>{t("test.saveDifficulty")}</Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
+      <TestRunnerView
+        t={t}
+        activeAttempt={activeAttempt}
+        activeDefinition={activeDefinition}
+        currentQueueItem={currentQueueItem}
+        currentAnswer={currentAnswer}
+        currentDraft={currentDraft}
+        hasSubmittedCurrentAnswer={hasSubmittedCurrentAnswer}
+        showAnswer={showAnswer}
+        showNext={showNext}
+        allowUnanswered={allowUnanswered}
+        originalCounters={originalCounters}
+        elapsedSeconds={elapsedSeconds}
+        effectiveTimeLimitMinutes={effectiveTimeLimitMinutes}
+        timeUrgency={timeUrgency}
+        visibleQuestionPosition={visibleQuestionPosition}
+        visibleCategory={visibleCategory}
+        answerExplanation={answerExplanation}
+        difficultyButtonLabel={difficultyButtonLabel}
+        finishWarning={finishWarning}
+        finishConfirmOpen={finishConfirmOpen}
+        finishSummary={finishSummary}
+        difficultyModalOpen={difficultyModalOpen}
+        difficultyTarget={difficultyTarget}
+        difficultyOptions={DIFFICULTY_OPTIONS}
+        difficultySelection={difficultySelection}
+        completionInFlight={completionInFlightRef.current}
+        formatDuration={formatDuration}
+        onOpenDifficultyModal={openDifficultyModal}
+        onDifficultySelectionChange={setDifficultySelection}
+        onCloseDifficultyModal={closeDifficultyModal}
+        onSaveQuestionDifficulty={saveQuestionDifficulty}
+        onSelectDraftAnswer={selectDraftAnswer}
+        onSubmitCurrentAnswer={submitCurrentAnswer}
+        onGoToPreviousQuestion={goToPreviousQuestion}
+        onGoToNextQuestion={goToNextQuestion}
+        onRequestFinishConfirmation={requestFinishConfirmation}
+        onCloseFinishConfirm={() => setFinishConfirmOpen(false)}
+        onCompleteManual={() => completeActiveTest("manual")}
+      />
     );
   }
 
@@ -943,10 +774,6 @@ function formatDuration(seconds: number) {
 function formatDateTime(iso: string) {
   const date = new Date(iso);
   return date.toLocaleString();
-}
-
-function getVisibleOptionLabel(index: number) {
-  return String.fromCharCode(65 + index);
 }
 
 function getTimeUrgency(elapsedSeconds: number, timeLimitMinutes: number) {
