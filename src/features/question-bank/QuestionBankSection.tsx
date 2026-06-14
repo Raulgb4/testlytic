@@ -1,0 +1,513 @@
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Translator } from "../../app/types";
+import { Button } from "../../shared/components/Button";
+import { Card } from "../../shared/components/Card";
+import { Toast } from "../../shared/components/Toast";
+import {
+  ImportErrors,
+  ImportStatus,
+  isImportBusy,
+  QuestionCollectionOnboarding,
+} from "../test/QuestionCollectionOnboarding";
+import {
+  DuplicateQuestionPreview,
+  ImportCollectionResult,
+  ImportConflictResolution,
+  ImportProcessingState,
+  PendingImportConflict,
+} from "../test/questionCollectionImport";
+import { QUESTION_BANK_EXPORT_FILE_NAME } from "../test/questionCollectionExport";
+import { saveQuestionCollectionTemplate } from "../test/questionCollectionTemplate";
+import { saveJsonFile } from "../test/questionCollectionTemplate";
+import { exportQuestionBank } from "../../services/persistence";
+import "./question-bank.css";
+import {
+  CollectionQuestion,
+  QuestionCollection,
+  ValidationIssue,
+} from "../test/questionCollectionTypes";
+import { getCategoryOptions, getSubcategoryOptions } from "../test/testUtils";
+
+const PAGE_SIZE = 100;
+
+export function QuestionBankSection({
+  t,
+  collection,
+  validationErrors,
+  importProcessing,
+  pendingImportConflict,
+  onImportFile,
+  onClearValidationErrors,
+  onResolveImportConflict,
+  onCancelImportConflict,
+}: {
+  t: Translator;
+  collection: QuestionCollection | null;
+  validationErrors: ValidationIssue[];
+  importProcessing: ImportProcessingState;
+  pendingImportConflict: PendingImportConflict | null;
+  onImportFile: (file: File, merge?: boolean) => Promise<ImportCollectionResult>;
+  onClearValidationErrors: () => void;
+  onResolveImportConflict: (
+    resolution: ImportConflictResolution,
+  ) => Promise<{ status: "imported" } | { status: "cancelled" }>;
+  onCancelImportConflict: () => { status: "cancelled" };
+}) {
+  const importMoreInputId = useId();
+  const importMoreInputRef = useRef<HTMLInputElement | null>(null);
+  const [importMoreOpen, setImportMoreOpen] = useState(false);
+  const [toast, setToast] = useState<null | { message: string; variant: "success" | "error" }>(
+    null,
+  );
+  const importBusy = isImportBusy(importProcessing.stage);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const handleDownloadTemplate = async () => {
+    const result = await saveQuestionCollectionTemplate();
+    if (result.status === "saved") {
+      setToast({ message: t("test.templateSavedSuccess"), variant: "success" });
+      return;
+    }
+    if (result.status === "error") {
+      setToast({ message: t("test.templateSavedError"), variant: "error" });
+    }
+  };
+
+  const handleInitialImport = async (file: File) => {
+    await onImportFile(file, false);
+  };
+
+  const handleExportQuestionBank = async () => {
+    if (!collection) return;
+    const payload = await exportQuestionBank();
+    const result = await saveJsonFile(
+      QUESTION_BANK_EXPORT_FILE_NAME,
+      JSON.stringify(payload, null, 2),
+    );
+    if (result.status === "saved") {
+      setToast({ message: t("questionBank.exportSavedSuccess"), variant: "success" });
+      return;
+    }
+    if (result.status === "error") {
+      setToast({ message: t("questionBank.exportSavedError"), variant: "error" });
+    }
+  };
+
+  const handleImportMore = async (file: File) => {
+    const result = await onImportFile(file, true);
+    if (result.status === "imported" || result.status === "conflict") {
+      setImportMoreOpen(false);
+    }
+  };
+
+  const resolveConflict = async (resolution: ImportConflictResolution) => {
+    const result = await onResolveImportConflict(resolution);
+    if (result.status !== "imported") return;
+    setToast({
+      message:
+        resolution === "importCopies"
+          ? t("questionBank.importResolvedNewIdsSuccess")
+          : t("questionBank.importResolvedReplaceSuccess"),
+      variant: "success",
+    });
+  };
+
+  const cancelConflict = () => {
+    onCancelImportConflict();
+  };
+
+  const closeImportMore = () => {
+    setImportMoreOpen(false);
+    onClearValidationErrors();
+  };
+
+  if (!collection) {
+    return (
+      <>
+        <QuestionCollectionOnboarding
+          t={t}
+          errors={validationErrors}
+          importProcessing={importProcessing}
+          onDownloadTemplate={handleDownloadTemplate}
+          onImportFile={(file) => void handleInitialImport(file)}
+        />
+        {pendingImportConflict ? (
+          <ImportConflictModal
+            t={t}
+            duplicateQuestions={pendingImportConflict.duplicateQuestions}
+            onResolve={resolveConflict}
+            onCancel={cancelConflict}
+          />
+        ) : null}
+        {toast ? (
+          <Toast
+            message={toast.message}
+            variant={toast.variant}
+            onClose={() => setToast(null)}
+            closeLabel={t("test.toastClose")}
+          />
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <div className="question-bank-view">
+      <Card
+        title={t("questionBank.summaryTitle")}
+        subtitle={t("questionBank.summarySubtitle")}
+        className="question-bank-summary-card"
+      >
+        <div className="bank-summary">
+          <MetricLine
+            label={t("test.questions")}
+            value={String(collection.summary.totalQuestions)}
+          />
+          <MetricLine
+            label={t("test.topicCategories")}
+            value={String(collection.summary.totalCategories)}
+          />
+          <MetricLine
+            label={t("test.collectionSubcategories")}
+            value={String(collection.summary.totalSubcategories)}
+          />
+          <MetricLine
+            label={t("test.lastUpdated")}
+            value={new Date(collection.importedAt).toLocaleString()}
+          />
+        </div>
+        <div className="question-bank-summary-actions">
+          <Button variant="secondary" onClick={() => setImportMoreOpen(true)} disabled={importBusy}>
+            {t("test.importMoreQuestions")}
+          </Button>
+          <Button onClick={() => void handleExportQuestionBank()}>
+            {t("questionBank.exportQuestionBank")}
+          </Button>
+        </div>
+      </Card>
+
+      <QuestionTable t={t} questions={collection.questions} />
+
+      {importMoreOpen ? (
+        <div className="settings-modal-backdrop" role="presentation">
+          <div className="settings-modal import-more-modal" role="dialog" aria-modal="true">
+            <h3>{t("test.importMoreQuestions")}</h3>
+            <p>{t("test.importMoreDescription")}</p>
+
+            <div className="import-more-actions" aria-label={t("test.collectionActionsLabel")}>
+              <Button
+                variant="secondary"
+                onClick={() => void handleDownloadTemplate()}
+                disabled={importBusy}
+              >
+                {t("test.downloadTemplate")}
+              </Button>
+              <Button onClick={() => importMoreInputRef.current?.click()} disabled={importBusy}>
+                {t("test.importCollection")}
+              </Button>
+              <Button variant="secondary" onClick={closeImportMore} disabled={importBusy}>
+                {t("test.cancel")}
+              </Button>
+            </div>
+
+            <ImportStatus t={t} importProcessing={importProcessing} />
+
+            <input
+              id={importMoreInputId}
+              ref={importMoreInputRef}
+              className="collection-file-input"
+              type="file"
+              accept="application/json,.json"
+              disabled={importBusy}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleImportMore(file);
+                event.currentTarget.value = "";
+              }}
+            />
+
+            {validationErrors.length > 0 ? <ImportErrors t={t} errors={validationErrors} /> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {pendingImportConflict ? (
+        <ImportConflictModal
+          t={t}
+          duplicateQuestions={pendingImportConflict.duplicateQuestions}
+          onResolve={resolveConflict}
+          onCancel={cancelConflict}
+        />
+      ) : null}
+
+      {toast ? (
+        <Toast
+          message={toast.message}
+          variant={toast.variant}
+          onClose={() => setToast(null)}
+          closeLabel={t("test.toastClose")}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ImportConflictModal({
+  t,
+  duplicateQuestions,
+  onResolve,
+  onCancel,
+}: {
+  t: Translator;
+  duplicateQuestions: DuplicateQuestionPreview[];
+  onResolve: (resolution: ImportConflictResolution) => void | Promise<void>;
+  onCancel: () => void;
+}) {
+  const visibleQuestions = duplicateQuestions.slice(0, 5);
+  const remainingCount = Math.max(0, duplicateQuestions.length - visibleQuestions.length);
+
+  return (
+    <div className="settings-modal-backdrop" role="presentation">
+      <div className="settings-modal import-conflict-modal" role="dialog" aria-modal="true">
+        <h3>{t("questionBank.importConflictTitle")}</h3>
+        <p>{t("questionBank.importConflictBody")}</p>
+
+        <div className="import-conflict-summary">
+          <MetricLine
+            label={t("questionBank.importConflictDuplicateCount")}
+            value={String(duplicateQuestions.length)}
+          />
+        </div>
+
+        <div className="import-conflict-id-list">
+          <span>{t("questionBank.importConflictExamples")}</span>
+          <ul>
+            {visibleQuestions.map((duplicate, index) => (
+              <li key={`${duplicate.fingerprint}-${index}`}>{duplicate.question}</li>
+            ))}
+          </ul>
+          {remainingCount > 0 ? (
+            <p>{t("questionBank.importConflictMore", { count: remainingCount })}</p>
+          ) : null}
+        </div>
+
+        <div className="import-conflict-help">
+          <p>
+            <strong>{t("questionBank.importConflictNewIds")}</strong>:{" "}
+            {t("questionBank.importConflictNewIdsHelp")}
+          </p>
+          <p>
+            <strong>{t("questionBank.importConflictReplace")}</strong>:{" "}
+            {t("questionBank.importConflictReplaceHelp")}
+          </p>
+        </div>
+
+        <div className="import-conflict-actions">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => onResolve("importCopies")}
+          >
+            {t("questionBank.importConflictNewIds")}
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={() => onResolve("replaceExisting")}
+          >
+            {t("questionBank.importConflictReplace")}
+          </button>
+          <Button variant="secondary" onClick={onCancel}>
+            {t("questionBank.importConflictCancel")}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuestionTable({ t, questions }: { t: Translator; questions: CollectionQuestion[] }) {
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("");
+  const [subcategory, setSubcategory] = useState("");
+  const [questionType, setQuestionType] = useState("");
+  const [page, setPage] = useState(1);
+
+  const categoryOptions = useMemo(() => getCategoryOptions(questions), [questions]);
+  const subcategoryOptions = useMemo(() => {
+    const categories = category ? [category] : categoryOptions;
+    return getSubcategoryOptions(questions, categories);
+  }, [category, categoryOptions, questions]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, category, subcategory, questionType]);
+
+  useEffect(() => {
+    if (subcategory && !subcategoryOptions.includes(subcategory)) {
+      setSubcategory("");
+    }
+  }, [subcategory, subcategoryOptions]);
+
+  const filteredQuestions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return questions.filter((question) => {
+      if (category && question.questionCategory !== category) return false;
+      if (subcategory && question.questionSubcategory !== subcategory) return false;
+      if (questionType && question.questionType !== questionType) return false;
+      if (!normalizedQuery) return true;
+      return question.question.toLowerCase().includes(normalizedQuery);
+    });
+  }, [category, query, questionType, questions, subcategory]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredQuestions.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const visibleQuestions = filteredQuestions.slice(pageStart, pageStart + PAGE_SIZE);
+  const rangeStart = filteredQuestions.length === 0 ? 0 : pageStart + 1;
+  const rangeEnd = Math.min(pageStart + PAGE_SIZE, filteredQuestions.length);
+
+  return (
+    <Card
+      title={t("questionBank.tableTitle")}
+      subtitle={t("questionBank.tableSubtitle", { count: questions.length })}
+      className="question-table-card"
+    >
+      <div className="question-table-toolbar">
+        <label className="field">
+          <span>{t("questionBank.searchLabel")}</span>
+          <input
+            className="input"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("questionBank.searchPlaceholder")}
+          />
+        </label>
+
+        <label className="field">
+          <span>{t("questionBank.categoryFilter")}</span>
+          <select
+            className="input"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+          >
+            <option value="">{t("questionBank.allCategories")}</option>
+            {categoryOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <span>{t("questionBank.subcategoryFilter")}</span>
+          <select
+            className="input"
+            value={subcategory}
+            onChange={(event) => setSubcategory(event.target.value)}
+          >
+            <option value="">{t("questionBank.allSubcategories")}</option>
+            {subcategoryOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <span>{t("questionBank.typeFilter")}</span>
+          <select
+            className="input"
+            value={questionType}
+            onChange={(event) => setQuestionType(event.target.value)}
+          >
+            <option value="">{t("questionBank.allTypes")}</option>
+            <option value="single_choice">{t("questionBank.singleChoice")}</option>
+            <option value="multiple_choice">{t("questionBank.multipleChoice")}</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="question-table-meta">
+        {t("questionBank.tableRange", {
+          start: rangeStart,
+          end: rangeEnd,
+          total: filteredQuestions.length,
+        })}
+      </div>
+
+      <div className="question-table-scroll">
+        <table className="question-table">
+          <thead>
+            <tr>
+              <th scope="col">{t("questionBank.columnQuestion")}</th>
+              <th scope="col">{t("questionBank.columnType")}</th>
+              <th scope="col">{t("questionBank.columnCategory")}</th>
+              <th scope="col">{t("questionBank.columnSubcategory")}</th>
+              <th scope="col">{t("questionBank.columnSeen")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleQuestions.map((question) => (
+              <tr key={question.id}>
+                <td className="question-table-question" title={question.question}>
+                  {question.question}
+                </td>
+                <td>
+                  {question.questionType === "single_choice"
+                    ? t("questionBank.singleChoice")
+                    : t("questionBank.multipleChoice")}
+                </td>
+                <td>{question.questionCategory}</td>
+                <td>{question.questionSubcategory || t("questionBank.noSubcategory")}</td>
+                <td>
+                  {question.analytics.exposureCount > 0
+                    ? question.analytics.exposureCount
+                    : t("questionBank.neverSeen")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {visibleQuestions.length === 0 ? (
+        <p className="placeholder-note question-table-empty">{t("questionBank.noMatches")}</p>
+      ) : null}
+
+      <div className="question-table-pagination" aria-label={t("questionBank.paginationLabel")}>
+        <Button
+          variant="secondary"
+          disabled={safePage <= 1}
+          onClick={() => setPage((current) => Math.max(1, current - 1))}
+        >
+          {t("test.previous")}
+        </Button>
+        <span>{t("questionBank.pageStatus", { page: safePage, total: totalPages })}</span>
+        <Button
+          variant="secondary"
+          disabled={safePage >= totalPages}
+          onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+        >
+          {t("test.next")}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function MetricLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric-inline">
+      <span className="metric-inline-label">{label}</span>
+      <span className="metric-inline-value">{value}</span>
+    </div>
+  );
+}
