@@ -1,38 +1,7 @@
 import { Dispatch, FormEvent, RefObject, SetStateAction } from "react";
 import { Translator } from "../../../app/types";
 import { SearchableMultiSelect } from "../components/SearchableMultiSelect";
-
-export type TestFormState = {
-  title: string;
-  questionLimit: number;
-  includedCategories: string[];
-  includedSubcategories: string[];
-  allowUnanswered: boolean;
-  timeLimitEnabled: boolean;
-  negativeMarkingEnabled: boolean;
-  penaltyPerIncorrectAnswer: number;
-  timeLimitMinutes: number;
-};
-
-export type TestDefinitionFormValidation = {
-  errors: {
-    title?: string;
-    questionLimit?: string;
-    includedCategories?: string;
-    timeLimitMinutes?: string;
-    penaltyPerIncorrectAnswer?: string;
-  };
-  summary: string[];
-  matchingCount: number;
-  limitWarning: string;
-  order: readonly [
-    "title",
-    "questionLimit",
-    "includedCategories",
-    "timeLimitMinutes",
-    "penaltyPerIncorrectAnswer",
-  ];
-};
+import { TestDefinitionFormValidation, TestFormState } from "./testDefinitionForm";
 
 export function TestDefinitionFormModal({
   t,
