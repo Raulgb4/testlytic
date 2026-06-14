@@ -142,7 +142,7 @@ export function SettingsSection({
           </div>
           <div className="settings-about-row">
             <span>{t("settings.aboutVersionLabel")}</span>
-            <p>0.1.0</p>
+            <p>1.0.0</p>
           </div>
           <div className="settings-about-row">
             <span>{t("settings.aboutLicenseLabel")}</span>

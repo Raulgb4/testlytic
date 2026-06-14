@@ -2,246 +2,117 @@
 
 ## Product Focus
 
-- Testlytic is a local-first desktop application for practicing and analyzing multiple-choice tests.
-- The core objective is improving learning outcomes through structured practice and performance analytics.
-- Questions, test sessions, and statistics belong to the user and remain stored locally.
-- Analytics are a first-class feature, not an afterthought.
-- The application prioritizes study efficiency over content creation.
+- Testlytic is a local-first desktop app for practicing and analyzing multiple-choice tests.
+- Questions, saved tests, completed attempts, recovery data, preferences, and analytics inputs remain on the user's device by default.
+- Version `1.0.0` prioritizes import, practice, recovery, results, analytics, PDF export, and data safety over in-app question authoring.
+- Analytics are a first-class feature and derive from completed test sessions and stored question-bank statistics.
 
----
-
-## UX Principles
-
-- Keep starting a test fast and frictionless.
-- Make question navigation clear and predictable.
-- Keep the user focused on answering questions, not managing settings.
-- Present analytics in a visual and understandable way.
-- Require confirmation before destructive actions.
-- Preserve light/dark parity using shared theme tokens.
-- Maintain a responsive desktop experience across different window sizes.
-- Optimize for long study sessions with minimal cognitive load.
-
----
-
-## Information Architecture
-
-### Home
-
-- quick statistics overview
-- total questions available
-- recent test sessions
-- average score
-- weakest topics
-- quick start test actions
-- import questions entry point
-
-### Practice
-
-- test configuration
-- topic selection
-- randomization options
-- simulation mode
-- active test session
-- question navigation
-
-### Analytics
-
-#### Dashboard
-
-- KPI cards
-- performance trends
-- topic breakdown
-- weakest areas
-- strongest areas
-- progress charts
-
-#### Test History
-
-- search
-- filters
-- sorting
-- pagination
-- session details
-- session deletion
+## Current Information Architecture
 
 ### Question Bank
 
-- imported question overview
-- topic management
-- category management
-- tag filtering
-- import validation results
+- First-run onboarding with JSON template download and import action.
+- JSON validation before persistence.
+- Duplicate detection and resolution when merging imports.
+- Question-bank summary metrics.
+- Search and filtering by question text, type, category, subcategory, and difficulty.
+- Paginated table with horizontal scroll for dense banks.
+- JSON export through an explicit user save action.
+
+### Test
+
+- Empty state when no question bank exists.
+- Test definition modal with title, question count, categories, subcategories, time limit, negative marking, and unanswered-question settings.
+- Saved test list with run and delete actions.
+- Smart Selection generation from eligible stored questions.
+- Active test execution with one question at a time, answer selection, progress, timer state, unanswered handling, and finish confirmation.
+- Difficulty rating for questions during review/execution flows.
+- Active test recovery after restart or accidental close.
+- Results review with score, grade, accuracy, category breakdown, answer snapshots, explanations, and retry metrics.
+- PDF export for generated test content.
+
+### Analytics
+
+- User analytics from completed attempts only.
+- Question-bank analytics from stored question metadata and exposure history.
+- Filters for date range, category, and subcategory.
+- KPI cards, trend bars, distribution bars, ranking lists, insight panels, and Smart Selection health.
 
 ### Settings
 
-- language
-- theme
-- data management
-- import preferences
-- danger zone
-- about metadata
+- Language selection for English and Spanish.
+- Light/dark theme switching through shared theme tokens.
+- Destructive data actions with confirmation.
+- About metadata including app version.
 
----
+## UX Principles
+
+- Keep importing and starting tests fast.
+- Validate before persistence and never let invalid imports corrupt local storage.
+- Keep active tests distraction-free.
+- Make question navigation, unanswered states, timer state, and finish rules clear.
+- Preserve recovery options after interrupted sessions.
+- Require confirmation before destructive actions.
+- Keep analytics readable, deterministic, and actionable.
+- Preserve light/dark parity using shared theme tokens.
+- Maintain keyboard access, visible focus states, sufficient contrast, and readable typography.
 
 ## Question Bank Principles
 
-- Questions are imported, not manually authored inside the application.
-- JSON is the primary import format.
+- Questions are imported from JSON, not manually authored inside the app.
+- JSON schema version `"1"` is the current import/export format.
+- Required fields are question text, question type, options, correct option IDs, and category.
+- Optional metadata includes auxiliary information, explanation, subcategory, source, and option shuffling.
 - Imported data must be validated before persistence.
-- Invalid questions should never corrupt the database.
-- Question metadata should remain extensible.
-- Topics, categories, and tags must support future expansion.
-
----
+- Exports are user-initiated and should not include private data unless the user chooses to save it.
 
 ## Test Session Principles
 
-- Tests are generated from stored question banks.
-- Question order is randomized by default.
-- Users may skip questions and return later.
-- Unanswered questions remain a first-class state.
-- Negative marking rules must be configurable.
-- Time tracking must remain accurate throughout the session.
-- Test completion should preserve all answer data for later analysis.
+- Tests are generated from stored SQLite question data.
+- Smart Selection should favor unseen and under-exposed questions while using performance and difficulty signals.
+- Question option order may be shuffled according to question settings.
+- Unanswered questions are preserved as a distinct state.
+- Negative marking is configurable per saved test definition.
+- Timed tests must surface warning/critical states clearly.
+- Completion must preserve answer snapshots for later review and analytics.
+- Active recovery must preserve enough state to resume an interrupted test.
 
----
+## Results And Analytics Principles
 
-## Confirmation Modal Principles
-
-- Confirm before deleting questions.
-- Confirm before deleting test history.
-- Confirm before resetting analytics.
-- Confirm before importing data that overwrites existing content.
-- Cancel must preserve the current state.
-- Confirm must execute the intended action without side effects.
-
----
-
-## Analytics Principles
-
-- Analytics derive from completed test sessions only.
-- Historical results must remain immutable.
-- Topic performance is calculated from all completed attempts.
-- Accuracy percentages should always be clearly displayed.
-- Trends should prioritize clarity over complexity.
-- Analytics must remain understandable for non-technical users.
-
----
-
-## Learning Analytics
-
-### Core Metrics
-
-- average score
-- tests completed
-- questions answered
-- accuracy percentage
-- average completion time
-- improvement trend
-
-### Topic Metrics
-
-- best-performing topics
-- weakest topics
-- most attempted topics
-- least attempted topics
-
-### Question Metrics
-
-- most failed questions
-- most skipped questions
-- hardest questions
-- easiest questions
-
----
-
-## Test Session UX
-
-- Show one question at a time.
-- Keep answer options visually clear.
-- Highlight current progress.
-- Display question position within the test.
-- Provide quick navigation to unanswered questions.
-- Preserve session state if the application is accidentally closed.
-- Keep the interface distraction-free during active tests.
-
----
-
-## Results UX
-
-- Present results immediately after completion.
-- Clearly separate correct, incorrect, and unanswered questions.
-- Display score, accuracy, and completion time.
-- Allow detailed answer review.
-- Show topic-level performance breakdown.
-- Surface actionable insights when possible.
-
----
+- Results appear immediately after completion.
+- Results separate correct, incorrect, unanswered, original, and retry data clearly.
+- Historical completed attempts should remain immutable.
+- Analytics derive from completed sessions and stored question statistics only.
+- Prefer transparent metrics: average grade, tests completed, questions answered, accuracy, completion time, trends, topic accuracy, strongest/weakest topics, missed questions, exposure, difficulty coverage, and Smart Selection health.
+- Avoid metrics that imply precision not supported by the data.
 
 ## Visual System
 
-- Tailwind utilities + shared CSS variables from `src/index.css`.
-- Card-based layout focused on data visibility.
-- Modern dashboard aesthetic inspired by Chronolytic.
-- Consistent spacing and typography hierarchy.
-- Minimal but meaningful animations.
-- Visual emphasis on KPIs and analytics.
-- Strong readability in both light and dark themes.
-
-### Design Characteristics
-
-- clean
-- modern
-- desktop-first
-- analytics-focused
-- minimalistic
-- information-dense without feeling cluttered
-
----
-
-## Dashboard Principles
-
-- Most important metrics appear above the fold.
-- Cards should communicate information at a glance.
-- Charts should answer specific questions.
-- Avoid decorative visualizations.
-- Maintain consistency across all analytics views.
-
----
+- The current visual system uses shared CSS variables in `src/index.css` plus feature CSS files.
+- Tailwind CSS is installed and imported, but the v1.0.0 release does not require a styling migration.
+- The UI should feel modern, desktop-first, card-based, analytics-forward, and information-dense without clutter.
+- Keep light/dark behavior token-driven instead of one-off color overrides.
+- Preserve meaningful motion for switches, selectors, and state changes without distracting from study flows.
 
 ## Accessibility
 
-- Keyboard navigation for all major actions.
-- Visible focus states.
-- Sufficient contrast ratios.
-- Consistent interaction patterns.
-- Readable typography at all supported sizes.
+- All primary actions should be keyboard reachable.
+- Focus states must remain visible in both themes.
+- Modals and confirmation flows must be understandable and operable without a mouse.
+- Form fields require clear labels and error text.
+- Tables and dense analytics views should remain readable at supported desktop sizes.
 
----
+## Data Persistence And Privacy
 
-## Data Persistence
-
-- SQLite is the single source of truth.
-- JSON is used primarily for import and export.
-- User data remains local by default.
-- Schema evolution should be additive whenever possible.
-- Data migrations must preserve existing study history.
-
----
+- SQLite is the local source of truth.
+- The app creates `testlytic.sqlite` in the per-user Tauri app data directory.
+- Local databases, WAL/SHM files, exported banks, and private question banks must not be committed or shipped accidentally.
+- JSON and PDF exports are explicit user actions.
+- Release artifacts must be inspected for private data before publication.
 
 ## Implementation Boundaries
 
-- Keep business logic out of React components.
-- Keep persistence and SQL access inside repository modules.
-- Keep analytics calculations pure and testable.
-- Keep UI components reusable and presentation-focused.
-- Prefer composition over large monolithic components.
-- Maintain strict separation between domain, persistence, and presentation layers.
-
----
-
-## Long-Term Vision
-
-Testlytic should feel like a professional desktop application for learning analytics.
-
-The goal is not simply to answer questions, but to help users understand how they learn, identify weaknesses, measure progress, and improve over time through meaningful data and structured practice.
+- Keep scoring, validation, import processing, test generation, Smart Selection, analytics, and PDF payload preparation testable outside presentation components where practical.
+- Keep SQL and persistence inside Rust/Tauri persistence code rather than React UI components.
+- Preserve a clear boundary between domain logic, persistence, and presentation.
+- Prefer small, focused changes for release preparation.
