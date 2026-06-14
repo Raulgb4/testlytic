@@ -174,6 +174,24 @@ JSON → Validation → SQLite → Tests → Analytics
 
 ---
 
+## Development Validation
+
+Install dependencies with the pinned pnpm version:
+
+```bash
+pnpm install
+```
+
+Before merging changes, run the same frontend quality gates used by GitHub CI:
+
+```bash
+pnpm run validate
+```
+
+This runs formatting checks, TypeScript type checking, the Vitest suite, the production build, Rust formatting, and Rust clippy.
+
+---
+
 ## Project Architecture
 
 Planned core modules:

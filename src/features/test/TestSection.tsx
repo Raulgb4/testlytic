@@ -1,410 +1,271 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Translator } from "../../app/types";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
-import { MetricCard } from "../../shared/components/MetricCard";
-import { toFixed } from "../../shared/utils/format";
-import { DEFAULT_TEST_CONFIG, MOCK_QUESTIONS } from "./mockQuestions";
-import { MockQuestion, TestConfig, TestFlowStatus, TestResult } from "./testTypes";
-import { buildTopicCategories, calculateResults, getFilteredQuestions } from "./testUtils";
+import { Toast } from "../../shared/components/Toast";
+import { ActiveTestRecovery } from "../../services/persistence";
+import { DeleteTestDefinitionModal } from "./definition/DeleteTestDefinitionModal";
+import { SavedTestsList } from "./definition/SavedTestsList";
+import { TestDefinitionFormModal } from "./definition/TestDefinitionFormModal";
+import { useActiveTestRunner } from "./hooks/useActiveTestRunner";
+import { usePdfExport } from "./hooks/usePdfExport";
+import { useTestDefinitionForm } from "./hooks/useTestDefinitionForm";
+import { DifficultyLevel, QuestionCollection } from "./questionCollectionTypes";
+import { RecoveryModal } from "./recovery/RecoveryModal";
+import { TestResultsView } from "./results/TestResultsView";
+import { TestRunnerView } from "./runner/TestRunnerView";
+import {
+  ActiveTestAttempt,
+  CompletedTestAttempt,
+  RuntimeAnswer,
+  RuntimeQueueItem,
+  TestDefinition,
+} from "./testTypes";
+import { getMatchingQuestions } from "./testUtils";
+import { getEffectiveTimeLimitMinutes } from "./testRuntimeUtils";
+import "./test.css";
 
-export function TestSection({ t }: { t: Translator }) {
-  const [status, setStatus] = useState<TestFlowStatus>("landing");
-  const [config, setConfig] = useState<TestConfig>(DEFAULT_TEST_CONFIG);
-  const [questions, setQuestions] = useState<MockQuestion[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string | null>>({});
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [result, setResult] = useState<TestResult | null>(null);
-  const [finishWarning, setFinishWarning] = useState("");
+type RatedDifficulty = Exclude<DifficultyLevel, "unrated">;
 
-  const beginSession = (nextConfig: TestConfig) => {
-    const sessionQuestions = getFilteredQuestions(nextConfig);
-    const initialAnswers: Record<string, string | null> = {};
-    for (const question of sessionQuestions) {
-      initialAnswers[question.id] = null;
-    }
-    setConfig(nextConfig);
-    setQuestions(sessionQuestions);
-    setAnswers(initialAnswers);
-    setCurrentIndex(0);
-    setResult(null);
-    setFinishWarning("");
-    setStatus("active");
-  };
+const DIFFICULTY_OPTIONS: Array<{ value: RatedDifficulty; labelKey: string }> = [
+  { value: "low", labelKey: "test.difficultyLow" },
+  { value: "medium", labelKey: "test.difficultyMedium" },
+  { value: "high", labelKey: "test.difficultyHigh" },
+];
 
-  const handleQuickStart = () => beginSession(DEFAULT_TEST_CONFIG);
-  const handleStartFromConfig = () => beginSession(config);
+export function TestSection({
+  t,
+  collection,
+  definitions,
+  onSaveDefinition,
+  onDeleteDefinition,
+  onGenerateQuestions,
+  pendingActiveRecovery,
+  activeRecoveryLoadError,
+  onSaveActiveRecovery,
+  onClearActiveRecovery,
+  onDiscardActiveRecovery,
+  onCompletedAttempt,
+  onUpdateQuestionDifficulty,
+  onGoToQuestionBank,
+}: {
+  t: Translator;
+  collection: QuestionCollection | null;
+  definitions: TestDefinition[];
+  onSaveDefinition: (definition: TestDefinition) => void;
+  onDeleteDefinition: (definition: TestDefinition) => void;
+  onGenerateQuestions: (definition: TestDefinition) => Promise<QuestionCollection["questions"]>;
+  pendingActiveRecovery: ActiveTestRecovery | null;
+  activeRecoveryLoadError: boolean;
+  onSaveActiveRecovery: (definition: TestDefinition, activeAttempt: ActiveTestAttempt) => void;
+  onClearActiveRecovery: () => void;
+  onDiscardActiveRecovery: () => void;
+  onCompletedAttempt: (
+    attempt: CompletedTestAttempt,
+    queue: RuntimeQueueItem[],
+    submittedAnswers: Record<string, RuntimeAnswer | undefined>,
+  ) => void;
+  onUpdateQuestionDifficulty: (questionId: string, difficulty: DifficultyLevel) => void;
+  onGoToQuestionBank: () => void;
+}) {
+  const [toast, setToast] = useState<null | { message: string; variant: "success" | "error" }>(
+    null,
+  );
+  const [deleteTarget, setDeleteTarget] = useState<TestDefinition | null>(null);
 
-  const setAnswer = (questionId: string, optionId: string) => {
-    setAnswers((current) => ({ ...current, [questionId]: optionId }));
-    setFinishWarning("");
-  };
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
-  const skipCurrent = () => {
-    const question = questions[currentIndex];
-    if (question) setAnswers((current) => ({ ...current, [question.id]: null }));
-    setFinishWarning("");
-  };
+  const bankQuestions = useMemo(() => collection?.questions || [], [collection]);
+  const {
+    formOpen,
+    setFormOpen,
+    formState,
+    setFormState,
+    editingTestId,
+    titleInputRef,
+    questionLimitInputRef,
+    categoriesTriggerRef,
+    timeLimitInputRef,
+    penaltyInputRef,
+    categoryOptions,
+    subcategoryOptions,
+    openCreate,
+    openEdit,
+    formValidation,
+    showErrors,
+    saveDefinition,
+    updateIncludedCategories,
+  } = useTestDefinitionForm({ bankQuestions, definitions, onSaveDefinition });
 
-  const finishSession = () => {
-    const unanswered = questions.filter((question) => !answers[question.id]).length;
-    if (!config.allowUnanswered && unanswered > 0) {
-      setFinishWarning(t("test.finishWarning", { count: unanswered }));
-      return;
-    }
-    setResult(calculateResults(questions, answers, config));
-    setStatus("results");
-  };
+  const { exportingPdfTestId, exportPdfDefinition } = usePdfExport({
+    t,
+    onGenerateQuestions,
+    setToast,
+  });
 
-  if (status === "configure") {
-    const availableForCategory = getFilteredQuestions({
-      ...config,
-      questionCount: MOCK_QUESTIONS.length,
-    }).length;
+  const {
+    activeAttempt,
+    resultAttempt,
+    setResultAttempt,
+    runDefinition,
+    continueRecoveredTest,
+    activeRunnerViewProps,
+  } = useActiveTestRunner({
+    t,
+    collection,
+    definitions,
+    onGenerateQuestions,
+    pendingActiveRecovery,
+    onSaveActiveRecovery,
+    onClearActiveRecovery,
+    onCompletedAttempt,
+    onUpdateQuestionDifficulty,
+    setToast,
+  });
 
-    const titleError = config.title.trim().length === 0;
-    const countError = config.questionCount < 1 || config.questionCount > availableForCategory;
-    const timeError = config.timeLimitMinutes < 0;
-    const isValid = !titleError && !countError && !timeError;
+  const recoveryModal =
+    (pendingActiveRecovery || activeRecoveryLoadError) && !activeAttempt && !resultAttempt ? (
+      <RecoveryModal
+        t={t}
+        pendingActiveRecovery={pendingActiveRecovery}
+        activeRecoveryLoadError={activeRecoveryLoadError}
+        onContinueRecoveredTest={continueRecoveredTest}
+        onDiscardActiveRecovery={onDiscardActiveRecovery}
+        formatDuration={formatDuration}
+      />
+    ) : null;
 
-    const topicOptions = buildTopicCategories(t("test.allTopics"), MOCK_QUESTIONS);
-
-    const update = <K extends keyof TestConfig>(key: K, value: TestConfig[K]) => {
-      setConfig({ ...config, [key]: value });
-    };
-
+  if (!collection) {
     return (
-      <div className="view-grid">
-        <Card title={t("test.configTitle")} subtitle={t("test.configSubtitle")}>
-          <div className="form-grid">
-            <label className="field">
-              <span>{t("test.title")}</span>
-              <input
-                className="input"
-                value={config.title}
-                onChange={(event) => update("title", event.target.value)}
-                placeholder={t("test.titlePlaceholder")}
-              />
-              {titleError ? <small className="field-error">{t("test.titleRequired")}</small> : null}
-            </label>
-
-            <label className="field">
-              <span>{t("test.topicCategory")}</span>
-              <select
-                className="input"
-                value={config.topicCategory}
-                onChange={(event) => update("topicCategory", event.target.value)}
-              >
-                {topicOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field">
-              <span>{t("test.questionCount")}</span>
-              <input
-                className="input"
-                type="number"
-                min={1}
-                max={Math.max(1, availableForCategory)}
-                value={config.questionCount}
-                onChange={(event) => update("questionCount", Number(event.target.value || 0))}
-              />
-              {countError ? (
-                <small className="field-error">
-                  {t("test.countRange", { max: availableForCategory })}
-                </small>
-              ) : null}
-            </label>
-
-            <label className="field">
-              <span>{t("test.timeLimit")}</span>
-              <input
-                className="input"
-                type="number"
-                min={0}
-                value={config.timeLimitMinutes}
-                onChange={(event) => update("timeLimitMinutes", Number(event.target.value || 0))}
-              />
-              {timeError ? (
-                <small className="field-error">{t("test.timeNonNegative")}</small>
-              ) : null}
-            </label>
-
-            <label className="field field-inline">
-              <input
-                type="checkbox"
-                checked={config.negativeMarking}
-                onChange={(event) => update("negativeMarking", event.target.checked)}
-              />
-              <span>{t("test.negativeMarking")}</span>
-            </label>
-
-            <label className="field">
-              <span>{t("test.negativeValue")}</span>
-              <input
-                className="input"
-                type="number"
-                min={0}
-                step={0.05}
-                disabled={!config.negativeMarking}
-                value={config.negativeMarkingValue}
-                onChange={(event) =>
-                  update("negativeMarkingValue", Number(event.target.value || 0))
-                }
-              />
-            </label>
-
-            <label className="field field-inline">
-              <input
-                type="checkbox"
-                checked={config.allowUnanswered}
-                onChange={(event) => update("allowUnanswered", event.target.checked)}
-              />
-              <span>{t("test.allowUnanswered")}</span>
-            </label>
-          </div>
-
-          <div className="card-actions">
-            <Button onClick={handleStartFromConfig} disabled={!isValid}>
-              {t("test.start")}
-            </Button>
-            <Button variant="secondary" onClick={() => setStatus("landing")}>
-              {t("test.cancel")}
-            </Button>
+      <div className="test-empty-state-wrap">
+        {recoveryModal}
+        <Card
+          title={t("test.emptyQuestionBankTitle")}
+          subtitle={t("test.emptyQuestionBankSubtitle")}
+          className="test-empty-state-card"
+        >
+          <p className="placeholder-note">{t("test.emptyQuestionBankBody")}</p>
+          <div className="test-empty-state-action">
+            <Button onClick={onGoToQuestionBank}>{t("test.goToQuestionBank")}</Button>
           </div>
         </Card>
       </div>
     );
   }
 
-  if (status === "active") {
-    if (questions.length === 0) {
-      setStatus("landing");
-    } else {
-      const currentQuestion = questions[currentIndex];
-      const answeredCount = questions.filter((question) => answers[question.id]).length;
-      return (
-        <div className="view-grid">
-          <Card
-            title={config.title}
-            subtitle={t("test.activeSubtitle", {
-              topicCategory: config.topicCategory,
-              current: currentIndex + 1,
-              total: questions.length,
-            })}
-          >
-            <div className="test-headline">
-              <span className="tag">
-                {t("test.answered", { count: answeredCount, total: questions.length })}
-              </span>
-              <span className="tag">
-                {t("test.timeStatic", { minutes: config.timeLimitMinutes })}
-              </span>
-            </div>
-          </Card>
-
-          <Card
-            title={t("test.questionTitle", { number: currentIndex + 1 })}
-            subtitle={`${currentQuestion.topic} / ${currentQuestion.category}`}
-          >
-            <p className="question-statement">{currentQuestion.statement}</p>
-            <div className="options-list">
-              {currentQuestion.options.map((option) => {
-                const selected = answers[currentQuestion.id] === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={selected ? "option-row selected" : "option-row"}
-                    onClick={() => setAnswer(currentQuestion.id, option.id)}
-                  >
-                    <span className="option-key">{option.id.toUpperCase()}</span>
-                    <span>{option.text}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
-
-          <Card title={t("test.progressTitle")} subtitle={t("test.progressSubtitle")}>
-            <div className="chips-grid">
-              {questions.map((question, index) => {
-                const isCurrent = index === currentIndex;
-                const isAnswered = Boolean(answers[question.id]);
-                const className = isCurrent
-                  ? "progress-chip current"
-                  : isAnswered
-                    ? "progress-chip answered"
-                    : "progress-chip";
-                return (
-                  <button
-                    key={question.id}
-                    type="button"
-                    className={className}
-                    onClick={() => setCurrentIndex(index)}
-                  >
-                    {index + 1}
-                  </button>
-                );
-              })}
-            </div>
-
-            {finishWarning ? <p className="field-error">{finishWarning}</p> : null}
-
-            <div className="card-actions">
-              <Button
-                variant="secondary"
-                onClick={() => setCurrentIndex((idx) => Math.max(0, idx - 1))}
-                disabled={currentIndex === 0}
-              >
-                {t("test.previous")}
-              </Button>
-              <Button variant="secondary" onClick={skipCurrent}>
-                {t("test.skip")}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setCurrentIndex((idx) => Math.min(questions.length - 1, idx + 1))}
-                disabled={currentIndex === questions.length - 1}
-              >
-                {t("test.next")}
-              </Button>
-              <Button onClick={finishSession}>{t("test.finish")}</Button>
-            </div>
-          </Card>
-        </div>
-      );
-    }
-  }
-
-  if (status === "results" && result) {
+  if (activeRunnerViewProps) {
     return (
-      <div className="view-grid">
-        <Card title={t("test.resultsTitle")} subtitle={t("test.resultsSubtitle")}>
-          <div className="kpi-grid">
-            <MetricCard
-              item={{
-                label: t("test.score"),
-                value: toFixed(result.score, 2),
-                change: config.negativeMarking
-                  ? t("test.negativeInfo", { value: config.negativeMarkingValue })
-                  : t("test.noNegative"),
-              }}
-            />
-            <MetricCard
-              item={{
-                label: t("test.correct"),
-                value: String(result.correct),
-                change: t("test.ofTotal", { total: result.total }),
-              }}
-            />
-            <MetricCard
-              item={{
-                label: t("test.incorrect"),
-                value: String(result.incorrect),
-                change: t("test.mockSession"),
-              }}
-            />
-            <MetricCard
-              item={{
-                label: t("test.unanswered"),
-                value: String(result.unanswered),
-                change: t("test.mockSession"),
-              }}
-            />
-          </div>
-        </Card>
-
-        <Card title={t("test.reviewTitle")} subtitle={t("test.reviewSubtitle")}>
-          <div className="review-list">
-            {questions.map((question, index) => {
-              const selected = answers[question.id];
-              const selectedText = question.options.find((option) => option.id === selected)?.text;
-              const correctText = question.options.find(
-                (option) => option.id === question.correctOptionId,
-              )?.text;
-              return (
-                <article key={question.id} className="review-item">
-                  <p className="review-title">
-                    Q{index + 1}. {question.statement}
-                  </p>
-                  <p className="review-line">
-                    {t("test.selected")}:{" "}
-                    {selected
-                      ? `${selected.toUpperCase()} · ${selectedText}`
-                      : t("test.unansweredText")}
-                  </p>
-                  <p className="review-line">
-                    {t("test.correctAnswer")}: {question.correctOptionId.toUpperCase()} ·{" "}
-                    {correctText}
-                  </p>
-                  <p className="review-note">
-                    {t("test.explanation")}: {question.explanation}
-                  </p>
-                </article>
-              );
-            })}
-          </div>
-
-          <div className="card-actions">
-            <Button onClick={() => beginSession(config)}>{t("test.startAnother")}</Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setStatus("landing");
-                setResult(null);
-              }}
-            >
-              {t("test.backHome")}
-            </Button>
-          </div>
-        </Card>
-      </div>
+      <TestRunnerView
+        t={t}
+        {...activeRunnerViewProps}
+        difficultyOptions={DIFFICULTY_OPTIONS}
+        formatDuration={formatDuration}
+      />
     );
   }
 
-  const categories = buildTopicCategories(t("test.allTopics"), MOCK_QUESTIONS);
+  if (resultAttempt) {
+    const { result, definition, reason } = resultAttempt;
+    return (
+      <TestResultsView
+        t={t}
+        result={result}
+        definition={definition}
+        reason={reason}
+        onReturnToHome={() => setResultAttempt(null)}
+        formatDateTime={formatDateTime}
+        formatDuration={formatDuration}
+      />
+    );
+  }
 
   return (
-    <div className="view-grid">
-      <Card title={t("test.quickStartTitle")} subtitle={t("test.quickStartSubtitle")}>
-        <div className="card-actions">
-          <Button onClick={handleQuickStart}>{t("test.startMock")}</Button>
-          <Button variant="secondary" onClick={() => setStatus("configure")}>
-            {t("test.configure")}
-          </Button>
+    <div className="view-grid test-home-grid">
+      {recoveryModal}
+      <div className="test-home-content">
+        <div className="configure-cta-wrap">
+          <button type="button" className="configure-cta" onClick={openCreate}>
+            {t("test.configureNewTest")}
+          </button>
         </div>
-      </Card>
 
-      <Card title={t("test.mockBankTitle")} subtitle={t("test.mockBankSubtitle")}>
-        <div className="bank-summary">
-          <div className="metric-inline">
-            <span className="metric-inline-label">{t("test.questions")}</span>
-            <span className="metric-inline-value">{MOCK_QUESTIONS.length}</span>
-          </div>
-          <div className="metric-inline">
-            <span className="metric-inline-label">{t("test.topicCategories")}</span>
-            <span className="metric-inline-value">{categories.length - 1}</span>
-          </div>
-        </div>
-      </Card>
+        <Card
+          title={t("test.savedTests")}
+          subtitle={t("test.workspaceSubtitle")}
+          className="test-home-card saved-tests-card"
+        >
+          <SavedTestsList
+            t={t}
+            definitions={definitions}
+            exportingPdfTestId={exportingPdfTestId}
+            getMatchingCount={(definition) =>
+              getMatchingQuestions(definition, collection.questions).length
+            }
+            getTimeLimitMinutes={getEffectiveTimeLimitMinutes}
+            onRunDefinition={(definition) => void runDefinition(definition)}
+            onExportPdfDefinition={(definition) => void exportPdfDefinition(definition)}
+            onOpenEdit={openEdit}
+            onDelete={setDeleteTarget}
+          />
+        </Card>
+      </div>
 
-      <Card title={t("test.jsonTitle")} subtitle={t("test.jsonSubtitle")}>
-        <p className="placeholder-note">{t("test.jsonNote")}</p>
-      </Card>
+      {formOpen ? (
+        <TestDefinitionFormModal
+          t={t}
+          editingTestId={editingTestId}
+          formState={formState}
+          setFormState={setFormState}
+          saveDefinition={saveDefinition}
+          showErrors={showErrors}
+          formValidation={formValidation}
+          categoryOptions={categoryOptions}
+          subcategoryOptions={subcategoryOptions}
+          updateIncludedCategories={updateIncludedCategories}
+          titleInputRef={titleInputRef}
+          questionLimitInputRef={questionLimitInputRef}
+          categoriesTriggerRef={categoriesTriggerRef}
+          timeLimitInputRef={timeLimitInputRef}
+          penaltyInputRef={penaltyInputRef}
+          onCancel={() => setFormOpen(false)}
+        />
+      ) : null}
 
-      <Card title={t("test.modesTitle")} subtitle={t("test.modesSubtitle")}>
-        <div className="mode-grid">
-          <div className="pill">{t("test.modePractice")}</div>
-          <div className="pill">{t("test.modeExam")}</div>
-          <div className="pill">{t("test.modeError")}</div>
-          <div className="pill">{t("test.modeTopic")}</div>
-        </div>
-      </Card>
+      <DeleteTestDefinitionModal
+        t={t}
+        deleteTarget={deleteTarget}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          onDeleteDefinition(deleteTarget);
+          setDeleteTarget(null);
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      {toast ? (
+        <Toast
+          message={toast.message}
+          variant={toast.variant}
+          onClose={() => setToast(null)}
+          closeLabel={t("test.toastClose")}
+        />
+      ) : null}
     </div>
   );
+}
+
+function formatDuration(seconds: number) {
+  const safe = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safe / 60);
+  const remainingSeconds = safe % 60;
+  return `${minutes}m ${String(remainingSeconds).padStart(2, "0")}s`;
+}
+
+function formatDateTime(iso: string) {
+  const date = new Date(iso);
+  return date.toLocaleString();
 }

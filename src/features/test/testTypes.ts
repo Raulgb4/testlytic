@@ -3,32 +3,88 @@ export type QuestionOption = {
   text: string;
 };
 
-export type MockQuestion = {
+export type RuntimeQuestion = {
   id: string;
-  statement: string;
-  topic: string;
-  category: string;
+  question: string;
+  auxiliaryInformation?: string;
+  questionType: "single_choice" | "multiple_choice";
+  questionCategory: string;
+  questionSubcategory?: string;
   options: QuestionOption[];
-  correctOptionId: string;
-  explanation: string;
+  correctOptions: string[];
+  shuffleOptions?: boolean;
+  correctAnswerExplanation?: string;
 };
 
-export type TestFlowStatus = "landing" | "configure" | "active" | "results";
-
-export type TestConfig = {
+export type TestDefinition = {
+  id: string;
   title: string;
-  topicCategory: string;
-  questionCount: number;
-  timeLimitMinutes: number;
-  negativeMarking: boolean;
-  negativeMarkingValue: number;
+  questionLimit: number;
+  includedCategories: string[];
+  includedSubcategories?: string[];
   allowUnanswered: boolean;
+  timeLimitEnabled?: boolean;
+  negativeMarkingEnabled: boolean;
+  penaltyPerIncorrectAnswer: number;
+  timeLimitMinutes: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
-export type TestResult = {
-  total: number;
+export type RuntimeAnswer = {
+  selectedOptionIds: string[];
+  isCorrect: boolean;
+  answeredAt: string;
+  attemptNumber: number;
+};
+
+export type RuntimeQueueItem = {
+  queueId: string;
+  sourceQuestionId: string;
+  retryNumber: number;
+  question: RuntimeQuestion;
+};
+
+export type ActiveTestAttempt = {
+  id: string;
+  testId: string;
+  startedAt: string;
+  savedElapsedSeconds: number;
+  queue: RuntimeQueueItem[];
+  originalQuestionCount: number;
+  submittedAnswers: Record<string, RuntimeAnswer | undefined>;
+  draftSelections: Record<string, string[] | undefined>;
+  currentQueueIndex: number;
+};
+
+export type TestAttempt = {
+  id: string;
+  testId: string;
+  testTitle: string;
+  startedAt: string;
+  completedAt: string;
+  durationSeconds: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  unansweredQuestions: number;
+  rawScore: number;
+  finalScore: number;
+  accuracyPercentage: number;
+  gradeOutOf10: number;
+  retryAttempts: number;
+  retryCorrectAnswers: number;
+  retryIncorrectAnswers: number;
+  categoryResults: CategoryAttemptResult[];
+};
+
+export type CategoryAttemptResult = {
+  category: string;
   correct: number;
   incorrect: number;
   unanswered: number;
-  score: number;
+  total: number;
+  accuracyPercentage: number;
 };
+
+export type CompletedTestAttempt = TestAttempt;

@@ -1,50 +1,159 @@
-import { MOCK_QUESTIONS } from "./mockQuestions";
-import { MockQuestion, TestConfig, TestResult } from "./testTypes";
+import { CollectionQuestion } from "./questionCollectionTypes";
+import { ActiveTestAttempt, RuntimeQuestion, TestAttempt, TestDefinition } from "./testTypes";
 
-export function formatTopicCategory(question: MockQuestion) {
-  return `${question.topic} / ${question.category}`;
+function shuffleArray<T>(items: T[]) {
+  const next = [...items];
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
 }
 
-export function buildTopicCategories(allTopicsLabel: string, questions: MockQuestion[]) {
-  return [allTopicsLabel, ...Array.from(new Set(questions.map(formatTopicCategory))).sort()];
+export function getCategoryOptions(questions: CollectionQuestion[]) {
+  return Array.from(new Set(questions.map((q) => q.questionCategory))).sort();
 }
 
-export function getFilteredQuestions(config: TestConfig) {
-  const base =
-    config.topicCategory === "All Topics"
-      ? MOCK_QUESTIONS
-      : MOCK_QUESTIONS.filter((question) => formatTopicCategory(question) === config.topicCategory);
-  return base.slice(0, Math.min(config.questionCount, base.length));
-}
-
-export function calculateResults(
-  questions: MockQuestion[],
-  answers: Record<string, string | null>,
-  config: TestConfig,
-): TestResult {
-  let correct = 0;
-  let incorrect = 0;
-  let unanswered = 0;
+export function getSubcategoryOptions(questions: CollectionQuestion[], categories: string[]) {
+  const set = new Set<string>();
   for (const question of questions) {
-    const selected = answers[question.id];
-    if (!selected) {
-      unanswered += 1;
+    if (!categories.includes(question.questionCategory)) continue;
+    if (question.questionSubcategory) set.add(question.questionSubcategory);
+  }
+  return Array.from(set).sort();
+}
+
+export function getMatchingQuestions(
+  definition: TestDefinition,
+  bankQuestions: CollectionQuestion[],
+) {
+  const hasSubcategories = (definition.includedSubcategories || []).length > 0;
+  return bankQuestions.filter((question) => {
+    if (!definition.includedCategories.includes(question.questionCategory)) {
+      return false;
+    }
+    if (!hasSubcategories) {
+      return true;
+    }
+    return Boolean(
+      question.questionSubcategory &&
+      definition.includedSubcategories?.includes(question.questionSubcategory),
+    );
+  });
+}
+
+export function buildRuntimeOptions(question: CollectionQuestion) {
+  return question.shuffleOptions !== false ? shuffleArray(question.options) : [...question.options];
+}
+
+export function buildRuntimeQuestions(
+  _definition: TestDefinition,
+  selectedQuestions: CollectionQuestion[],
+) {
+  return selectedQuestions.map<RuntimeQuestion>((question) => ({
+    id: question.id,
+    question: question.question,
+    auxiliaryInformation: question.auxiliaryInformation,
+    questionType: question.questionType,
+    questionCategory: question.questionCategory,
+    questionSubcategory: question.questionSubcategory,
+    options: buildRuntimeOptions(question),
+    correctOptions: question.correctOptions,
+    shuffleOptions: question.shuffleOptions,
+    correctAnswerExplanation: question.correctAnswerExplanation,
+  }));
+}
+
+export function isExactSetMatch(selectedOptionIds: string[], correctOptions: string[]) {
+  if (selectedOptionIds.length !== correctOptions.length) return false;
+  const selectedSet = new Set(selectedOptionIds);
+  return correctOptions.every((optionId) => selectedSet.has(optionId));
+}
+
+export function calculateAttemptResult(
+  activeAttempt: ActiveTestAttempt,
+  definition: TestDefinition,
+): TestAttempt {
+  let correctAnswers = 0;
+  let incorrectAnswers = 0;
+  let unansweredQuestions = 0;
+  let retryCorrectAnswers = 0;
+  let retryIncorrectAnswers = 0;
+  const categoryMap = new Map<
+    string,
+    { correct: number; incorrect: number; unanswered: number; total: number }
+  >();
+
+  for (const queueItem of activeAttempt.queue) {
+    const answer = activeAttempt.submittedAnswers[queueItem.queueId];
+    const isRetry = queueItem.retryNumber > 0;
+    if (isRetry) {
+      if (answer?.isCorrect) retryCorrectAnswers += 1;
+      if (answer && !answer.isCorrect) retryIncorrectAnswers += 1;
       continue;
     }
-    if (selected === question.correctOptionId) {
-      correct += 1;
-    } else {
-      incorrect += 1;
+
+    const category = queueItem.question.questionSubcategory
+      ? `${queueItem.question.questionCategory} / ${queueItem.question.questionSubcategory}`
+      : queueItem.question.questionCategory;
+    const current = categoryMap.get(category) ?? {
+      correct: 0,
+      incorrect: 0,
+      unanswered: 0,
+      total: 0,
+    };
+    current.total += 1;
+
+    if (!answer) {
+      unansweredQuestions += 1;
+      current.unanswered += 1;
+      categoryMap.set(category, current);
+      continue;
     }
+    if (answer.isCorrect) {
+      correctAnswers += 1;
+      current.correct += 1;
+    } else {
+      incorrectAnswers += 1;
+      current.incorrect += 1;
+    }
+    categoryMap.set(category, current);
   }
 
-  const score = correct - (config.negativeMarking ? incorrect * config.negativeMarkingValue : 0);
+  const completedAtIso = new Date().toISOString();
+  const rawScore = correctAnswers;
+  const finalScore = definition.negativeMarkingEnabled
+    ? correctAnswers - incorrectAnswers * definition.penaltyPerIncorrectAnswer
+    : correctAnswers;
+  const totalQuestions = activeAttempt.originalQuestionCount;
+  const accuracyPercentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+  const gradeOutOf10 = Math.max(
+    0,
+    Math.min(10, totalQuestions > 0 ? (finalScore / totalQuestions) * 10 : 0),
+  );
 
   return {
-    total: questions.length,
-    correct,
-    incorrect,
-    unanswered,
-    score,
+    id: `attempt-${Date.now()}`,
+    testId: activeAttempt.testId,
+    testTitle: definition.title,
+    startedAt: activeAttempt.startedAt,
+    completedAt: completedAtIso,
+    durationSeconds: Math.max(0, activeAttempt.savedElapsedSeconds),
+    totalQuestions,
+    correctAnswers,
+    incorrectAnswers,
+    unansweredQuestions,
+    rawScore,
+    finalScore,
+    accuracyPercentage,
+    gradeOutOf10,
+    retryAttempts: retryCorrectAnswers + retryIncorrectAnswers,
+    retryCorrectAnswers,
+    retryIncorrectAnswers,
+    categoryResults: Array.from(categoryMap.entries()).map(([category, result]) => ({
+      category,
+      ...result,
+      accuracyPercentage: result.total > 0 ? (result.correct / result.total) * 100 : 0,
+    })),
   };
 }
