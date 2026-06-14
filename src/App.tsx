@@ -330,7 +330,7 @@ function App() {
       testDefinition: definition,
       activeAttempt,
       savedAt: new Date().toISOString(),
-      appVersion: "0.1.0",
+      appVersion: "1.0.0",
     });
   };
 
