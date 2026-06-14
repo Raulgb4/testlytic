@@ -1469,25 +1469,27 @@ fn save_active_test_attempt(
     state: State<'_, DbState>,
     recovery: ActiveTestRecoveryDto,
 ) -> CommandResult<()> {
-    let conn = state.conn.lock().map_err(|error| error.to_string())?;
-    save_active_test_attempt_to_conn(&conn, &recovery)
+    let mut conn = state.conn.lock().map_err(|error| error.to_string())?;
+    save_active_test_attempt_to_conn(&mut conn, &recovery)
 }
 
 fn save_active_test_attempt_to_conn(
-    conn: &Connection,
+    conn: &mut Connection,
     recovery: &ActiveTestRecoveryDto,
 ) -> CommandResult<()> {
     let test_definition_snapshot =
         serde_json::to_string(&recovery.test_definition).map_err(|error| error.to_string())?;
     let active_attempt_snapshot =
         serde_json::to_string(&recovery.active_attempt).map_err(|error| error.to_string())?;
-    conn.execute("DELETE FROM active_test_attempts", [])
+    let tx = conn.transaction().map_err(|error| error.to_string())?;
+    tx.execute("DELETE FROM active_test_attempts", [])
         .map_err(|error| error.to_string())?;
-    conn.execute(
+    tx.execute(
         "INSERT INTO active_test_attempts(id, test_definition_snapshot, active_attempt_snapshot, saved_at, app_version) VALUES (?, ?, ?, ?, ?)",
         params![recovery.id, test_definition_snapshot, active_attempt_snapshot, recovery.saved_at, recovery.app_version],
     )
     .map_err(|error| error.to_string())?;
+    tx.commit().map_err(|error| error.to_string())?;
     Ok(())
 }
 
@@ -1761,7 +1763,7 @@ mod tests {
 
     #[test]
     fn active_recovery_save_load_and_clear_works() {
-        let conn = Connection::open_in_memory().unwrap();
+        let mut conn = Connection::open_in_memory().unwrap();
         initialize_db(&conn).unwrap();
         let recovery = ActiveTestRecoveryDto {
             id: "recovery-1".into(),
@@ -1779,7 +1781,7 @@ mod tests {
             app_version: Some("test".into()),
         };
 
-        save_active_test_attempt_to_conn(&conn, &recovery).unwrap();
+        save_active_test_attempt_to_conn(&mut conn, &recovery).unwrap();
         let loaded = get_active_test_attempt_from_conn(&conn).unwrap().unwrap();
 
         assert_eq!(loaded.id, "recovery-1");

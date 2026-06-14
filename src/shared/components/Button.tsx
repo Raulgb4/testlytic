@@ -1,14 +1,21 @@
-type ButtonProps = {
-  children: string;
-  variant?: "primary" | "secondary";
-  onClick?: () => void;
-  disabled?: boolean;
+import { ButtonHTMLAttributes, ReactNode } from "react";
+
+type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
+  children: ReactNode;
+  variant?: "primary" | "secondary" | "danger";
 };
 
-export function Button({ children, variant = "primary", onClick, disabled }: ButtonProps) {
-  const className = variant === "primary" ? "btn btn-primary" : "btn btn-secondary";
+export function Button({
+  children,
+  variant = "primary",
+  className,
+  type = "button",
+  ...props
+}: ButtonProps) {
+  const variantClassName = `btn btn-${variant}`;
+  const resolvedClassName = className ? `${variantClassName} ${className}` : variantClassName;
   return (
-    <button type="button" className={className} onClick={onClick} disabled={disabled}>
+    <button type={type} className={resolvedClassName} {...props}>
       {children}
     </button>
   );

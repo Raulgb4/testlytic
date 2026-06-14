@@ -3,6 +3,7 @@ import { Translator } from "../../app/types";
 import { Language } from "../../i18n";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
+import { Modal } from "../../shared/components/Modal";
 import "./settings.css";
 
 type ThemeMode = "dark" | "light";
@@ -155,35 +156,28 @@ export function SettingsSection({
       </Card>
 
       {confirmAction ? (
-        <div
-          className="settings-modal-backdrop"
-          role="presentation"
-          onClick={() => setConfirmAction(null)}
-        >
-          <div
-            className="settings-modal"
-            role="dialog"
-            aria-modal="true"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h3>{t("settings.confirmModalTitle")}</h3>
-            <p>
-              {confirmAction === "answers"
-                ? t("settings.confirmDeleteAnswers")
-                : confirmAction === "questionBank"
-                  ? t("settings.confirmResetQuestionBank")
-                  : t("settings.confirmDeleteTests")}
-            </p>
-            <div className="card-actions settings-modal-actions">
+        <Modal
+          title={t("settings.confirmModalTitle")}
+          onClose={() => setConfirmAction(null)}
+          actions={
+            <>
               <Button variant="secondary" onClick={() => setConfirmAction(null)}>
                 {t("test.cancel")}
               </Button>
-              <button type="button" className="btn btn-danger" onClick={runDangerAction}>
+              <Button variant="danger" onClick={runDangerAction}>
                 {t("settings.confirm")}
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          }
+        >
+          <p>
+            {confirmAction === "answers"
+              ? t("settings.confirmDeleteAnswers")
+              : confirmAction === "questionBank"
+                ? t("settings.confirmResetQuestionBank")
+                : t("settings.confirmDeleteTests")}
+          </p>
+        </Modal>
       ) : null}
     </div>
   );
