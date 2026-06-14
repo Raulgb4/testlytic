@@ -1,10 +1,16 @@
-import { FormEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Translator } from "../../app/types";
 import { Button } from "../../shared/components/Button";
 import { Card } from "../../shared/components/Card";
 import { Toast } from "../../shared/components/Toast";
 import { ActiveTestRecovery } from "../../services/persistence";
+import { MetricLine } from "./components/MetricLine";
+import { DeleteTestDefinitionModal } from "./definition/DeleteTestDefinitionModal";
+import { SavedTestsList } from "./definition/SavedTestsList";
+import { TestDefinitionFormModal, TestFormState } from "./definition/TestDefinitionFormModal";
 import { CollectionQuestion, DifficultyLevel, QuestionCollection } from "./questionCollectionTypes";
+import { RecoveryModal } from "./recovery/RecoveryModal";
+import { TestResultsView } from "./results/TestResultsView";
 import {
   ActiveTestAttempt,
   CompletedTestAttempt,
@@ -36,18 +42,6 @@ const DIFFICULTY_OPTIONS: Array<{ value: RatedDifficulty; labelKey: string }> = 
   { value: "medium", labelKey: "test.difficultyMedium" },
   { value: "high", labelKey: "test.difficultyHigh" },
 ];
-
-type TestFormState = {
-  title: string;
-  questionLimit: number;
-  includedCategories: string[];
-  includedSubcategories: string[];
-  allowUnanswered: boolean;
-  timeLimitEnabled: boolean;
-  negativeMarkingEnabled: boolean;
-  penaltyPerIncorrectAnswer: number;
-  timeLimitMinutes: number;
-};
 
 const INITIAL_FORM: TestFormState = {
   title: "",
@@ -568,52 +562,14 @@ export function TestSection({
 
   const recoveryModal =
     (pendingActiveRecovery || activeRecoveryLoadError) && !activeAttempt && !resultAttempt ? (
-      <div className="recovery-modal-backdrop" role="presentation">
-        <div
-          className="recovery-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="recovery-modal-title"
-        >
-          <h3 id="recovery-modal-title" className="recovery-modal-title">
-            {t("test.recoveryTitle")}
-          </h3>
-          {activeRecoveryLoadError ? (
-            <p className="recovery-modal-body">{t("test.recoveryCorruptBody")}</p>
-          ) : pendingActiveRecovery ? (
-            <>
-              <p className="recovery-modal-body">{t("test.recoveryBody")}</p>
-              <div className="recovery-modal-info">
-                <span>
-                  {t("test.recoveryTestInfo", {
-                    title: pendingActiveRecovery.testDefinition.title,
-                  })}
-                </span>
-                <span>
-                  {t("test.recoveryQuestionCount", {
-                    count: pendingActiveRecovery.activeAttempt.originalQuestionCount,
-                  })}
-                </span>
-                <span>
-                  {t("test.recoveryElapsedTime", {
-                    duration: formatDuration(
-                      pendingActiveRecovery.activeAttempt.savedElapsedSeconds ?? 0,
-                    ),
-                  })}
-                </span>
-              </div>
-            </>
-          ) : null}
-          <div className="recovery-modal-actions">
-            {pendingActiveRecovery ? (
-              <Button onClick={continueRecoveredTest}>{t("test.continueTest")}</Button>
-            ) : null}
-            <button type="button" className="btn btn-danger" onClick={onDiscardActiveRecovery}>
-              {t("test.exitTest")}
-            </button>
-          </div>
-        </div>
-      </div>
+      <RecoveryModal
+        t={t}
+        pendingActiveRecovery={pendingActiveRecovery}
+        activeRecoveryLoadError={activeRecoveryLoadError}
+        onContinueRecoveredTest={continueRecoveredTest}
+        onDiscardActiveRecovery={onDiscardActiveRecovery}
+        formatDuration={formatDuration}
+      />
     ) : null;
 
   if (!collection) {
@@ -890,62 +846,15 @@ export function TestSection({
   if (resultAttempt) {
     const { result, definition, reason } = resultAttempt;
     return (
-      <div className="view-grid results-view">
-        <Card
-          title={t("test.finalGrade")}
-          subtitle={definition.title}
-          className="results-hero-card"
-        >
-          {reason === "timeout" ? (
-            <p className="results-timeout-notice">{t("test.timeUp")}</p>
-          ) : null}
-          <p className="results-grade">{result.gradeOutOf10.toFixed(1)} / 10</p>
-          <div className="results-meta-line">
-            <span>
-              {t("test.completedFriendly", { value: formatDateTime(result.completedAt) })}
-            </span>
-            <span>
-              {t("test.kpiDuration")}: {formatDuration(result.durationSeconds)}
-            </span>
-          </div>
-        </Card>
-
-        <Card
-          title={t("test.resultsTitle")}
-          subtitle={t("test.resultsSubtitle")}
-          className="results-summary-card"
-        >
-          <div className="kpi-grid results-kpi-grid">
-            <MetricLine
-              label={t("test.finalScoreFriendly")}
-              value={`${result.finalScore.toFixed(2)}`}
-            />
-            <MetricLine
-              label={t("test.kpiAccuracy")}
-              value={`${result.accuracyPercentage.toFixed(2)}%`}
-            />
-            <MetricLine label={t("test.kpiCorrect")} value={String(result.correctAnswers)} />
-            <MetricLine label={t("test.kpiIncorrect")} value={String(result.incorrectAnswers)} />
-            <MetricLine
-              label={t("test.kpiUnanswered")}
-              value={String(result.unansweredQuestions)}
-            />
-            <MetricLine
-              label={t("test.kpiDuration")}
-              value={formatDuration(result.durationSeconds)}
-            />
-          </div>
-          <div className="retry-summary">
-            <MetricLine label={t("test.retryAttempts")} value={String(result.retryAttempts)} />
-            <MetricLine label={t("test.retryCorrect")} value={String(result.retryCorrectAnswers)} />
-            <MetricLine label={t("test.retryWrong")} value={String(result.retryIncorrectAnswers)} />
-          </div>
-          <p className="placeholder-note">{t("test.retryLearningNote")}</p>
-          <div className="results-return-action">
-            <Button onClick={() => setResultAttempt(null)}>{t("test.returnToHome")}</Button>
-          </div>
-        </Card>
-      </div>
+      <TestResultsView
+        t={t}
+        result={result}
+        definition={definition}
+        reason={reason}
+        onReturnToHome={() => setResultAttempt(null)}
+        formatDateTime={formatDateTime}
+        formatDuration={formatDuration}
+      />
     );
   }
 
@@ -964,304 +873,53 @@ export function TestSection({
           subtitle={t("test.workspaceSubtitle")}
           className="test-home-card saved-tests-card"
         >
-          <div className="saved-tests-section">
-            {definitions.length === 0 ? (
-              <p className="placeholder-note">{t("test.noSavedTests")}</p>
-            ) : null}
-            <div className="saved-tests-list">
-              {definitions.map((definition) => {
-                const matchingCount = getMatchingQuestions(definition, collection.questions).length;
-                return (
-                  <article key={definition.id} className="saved-test-item">
-                    <div>
-                      <p className="saved-test-title">{definition.title}</p>
-                      <p className="saved-test-meta">
-                        {t("test.savedTestMeta", {
-                          questions: definition.questionLimit,
-                          categories: definition.includedCategories.length,
-                          time:
-                            getEffectiveTimeLimitMinutes(definition) > 0
-                              ? t("test.savedTestTimeLimit", {
-                                  minutes: getEffectiveTimeLimitMinutes(definition),
-                                })
-                              : t("test.savedTestNoTimeLimit"),
-                          negative: definition.negativeMarkingEnabled
-                            ? t("test.savedTestNegativeOn")
-                            : t("test.savedTestNegativeOff"),
-                          matching: matchingCount,
-                        })}
-                      </p>
-                    </div>
-                    <div className="saved-test-actions">
-                      <Button onClick={() => void runDefinition(definition)}>
-                        {t("test.run")}
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        disabled={Boolean(exportingPdfTestId)}
-                        onClick={() => void exportPdfDefinition(definition)}
-                      >
-                        {exportingPdfTestId === definition.id
-                          ? t("test.exportingPdf")
-                          : t("test.exportPdf")}
-                      </Button>
-                      <Button variant="secondary" onClick={() => openEdit(definition)}>
-                        {t("test.edit")}
-                      </Button>
-                      <Button variant="secondary" onClick={() => setDeleteTarget(definition)}>
-                        {t("test.delete")}
-                      </Button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
+          <SavedTestsList
+            t={t}
+            definitions={definitions}
+            exportingPdfTestId={exportingPdfTestId}
+            getMatchingCount={(definition) =>
+              getMatchingQuestions(definition, collection.questions).length
+            }
+            getTimeLimitMinutes={getEffectiveTimeLimitMinutes}
+            onRunDefinition={(definition) => void runDefinition(definition)}
+            onExportPdfDefinition={(definition) => void exportPdfDefinition(definition)}
+            onOpenEdit={openEdit}
+            onDelete={setDeleteTarget}
+          />
         </Card>
       </div>
 
       {formOpen ? (
-        <div className="settings-modal-backdrop" role="presentation">
-          <div
-            className="settings-modal test-definition-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="test-definition-title"
-          >
-            <h3 id="test-definition-title">
-              {editingTestId ? t("test.editTest") : t("test.createTest")}
-            </h3>
-            <form className="test-definition-form" onSubmit={saveDefinition} noValidate>
-              <div className="test-definition-body">
-                <section className="test-form-section">
-                  <h4>{t("test.sectionBasics")}</h4>
-                  <label className="field">
-                    <span>{t("test.modalTitle")}</span>
-                    <input
-                      ref={titleInputRef}
-                      className="input"
-                      value={formState.title}
-                      onChange={(event) =>
-                        setFormState({ ...formState, title: event.target.value })
-                      }
-                      aria-invalid={showErrors && Boolean(formValidation.errors.title)}
-                    />
-                    {showErrors && formValidation.errors.title ? (
-                      <small className="field-error">{formValidation.errors.title}</small>
-                    ) : null}
-                  </label>
-
-                  <label className="field">
-                    <span>{t("test.questionLimit")}</span>
-                    <input
-                      ref={questionLimitInputRef}
-                      className="input"
-                      type="number"
-                      min={1}
-                      value={formState.questionLimit}
-                      onChange={(event) =>
-                        setFormState({
-                          ...formState,
-                          questionLimit: Number(event.target.value || 1),
-                        })
-                      }
-                      aria-invalid={showErrors && Boolean(formValidation.errors.questionLimit)}
-                    />
-                    {showErrors && formValidation.errors.questionLimit ? (
-                      <small className="field-error">{formValidation.errors.questionLimit}</small>
-                    ) : null}
-                    {formValidation.matchingCount > 0 ? (
-                      <small className="field-hint">
-                        {t("test.matchingCount", { count: formValidation.matchingCount })}
-                      </small>
-                    ) : null}
-                    {formValidation.limitWarning ? (
-                      <small className="field-warning">{formValidation.limitWarning}</small>
-                    ) : null}
-                  </label>
-                </section>
-
-                <section className="test-form-section">
-                  <h4>{t("test.sectionFilters")}</h4>
-                  <SearchableMultiSelect
-                    label={t("test.includedCategories")}
-                    placeholder={t("test.searchCategories")}
-                    options={categoryOptions}
-                    selected={formState.includedCategories}
-                    onChange={updateIncludedCategories}
-                    triggerRef={categoriesTriggerRef}
-                    error={showErrors ? formValidation.errors.includedCategories : undefined}
-                    selectedCountLabel={t("test.selectedCount", {
-                      count: formState.includedCategories.length,
-                    })}
-                    clearLabel={t("test.clearAll")}
-                    selectAllLabel={t("test.selectAllCategories")}
-                    onSelectAll={() => updateIncludedCategories(categoryOptions)}
-                    closeLabel={t("test.close")}
-                  />
-
-                  <SearchableMultiSelect
-                    label={t("test.includedSubcategoriesOptional")}
-                    placeholder={t("test.searchSubcategories")}
-                    options={subcategoryOptions}
-                    selected={formState.includedSubcategories}
-                    onChange={(next) => setFormState({ ...formState, includedSubcategories: next })}
-                    disabled={formState.includedCategories.length === 0}
-                    disabledText={t("test.selectCategoryFirst")}
-                    selectedCountLabel={t("test.selectedCount", {
-                      count: formState.includedSubcategories.length,
-                    })}
-                    clearLabel={t("test.clearAll")}
-                    selectAllLabel={t("test.selectAllCategories")}
-                    onSelectAll={() =>
-                      setFormState({ ...formState, includedSubcategories: subcategoryOptions })
-                    }
-                    closeLabel={t("test.close")}
-                  />
-                </section>
-
-                <section className="test-form-section">
-                  <h4>{t("test.sectionTimingScoring")}</h4>
-                  <label className="field-inline">
-                    <input
-                      type="checkbox"
-                      checked={formState.allowUnanswered}
-                      onChange={(event) =>
-                        setFormState({ ...formState, allowUnanswered: event.target.checked })
-                      }
-                    />
-                    <span>{t("test.allowUnanswered")}</span>
-                  </label>
-
-                  <label className="field-inline">
-                    <input
-                      type="checkbox"
-                      checked={formState.timeLimitEnabled}
-                      onChange={(event) =>
-                        setFormState({ ...formState, timeLimitEnabled: event.target.checked })
-                      }
-                    />
-                    <span>{t("test.enableTimeLimit")}</span>
-                  </label>
-
-                  <div
-                    className={
-                      formState.timeLimitEnabled ? "penalty-reveal show" : "penalty-reveal"
-                    }
-                  >
-                    <label className="field">
-                      <span>{t("test.timeLimit")}</span>
-                      <input
-                        ref={timeLimitInputRef}
-                        className="input"
-                        type="number"
-                        min={1}
-                        value={formState.timeLimitMinutes}
-                        onChange={(event) =>
-                          setFormState({
-                            ...formState,
-                            timeLimitMinutes: Number(event.target.value || 0),
-                          })
-                        }
-                        aria-invalid={showErrors && Boolean(formValidation.errors.timeLimitMinutes)}
-                      />
-                      {showErrors && formValidation.errors.timeLimitMinutes ? (
-                        <small className="field-error">
-                          {formValidation.errors.timeLimitMinutes}
-                        </small>
-                      ) : null}
-                    </label>
-                  </div>
-
-                  <label className="field-inline">
-                    <input
-                      type="checkbox"
-                      checked={formState.negativeMarkingEnabled}
-                      onChange={(event) =>
-                        setFormState({ ...formState, negativeMarkingEnabled: event.target.checked })
-                      }
-                    />
-                    <span>{t("test.negativeMarking")}</span>
-                  </label>
-
-                  <div
-                    className={
-                      formState.negativeMarkingEnabled ? "penalty-reveal show" : "penalty-reveal"
-                    }
-                  >
-                    <label className="field">
-                      <span>{t("test.penaltyPerIncorrectAnswer")}</span>
-                      <input
-                        ref={penaltyInputRef}
-                        className="input"
-                        type="number"
-                        min={0}
-                        step={0.05}
-                        value={formState.penaltyPerIncorrectAnswer}
-                        onChange={(event) =>
-                          setFormState({
-                            ...formState,
-                            penaltyPerIncorrectAnswer: Number(event.target.value || 0),
-                          })
-                        }
-                        aria-invalid={
-                          showErrors && Boolean(formValidation.errors.penaltyPerIncorrectAnswer)
-                        }
-                      />
-                      {showErrors && formValidation.errors.penaltyPerIncorrectAnswer ? (
-                        <small className="field-error">
-                          {formValidation.errors.penaltyPerIncorrectAnswer}
-                        </small>
-                      ) : null}
-                    </label>
-                  </div>
-                </section>
-              </div>
-
-              {showErrors && formValidation.summary.length > 0 ? (
-                <div className="form-error-summary" role="alert" aria-live="polite">
-                  <p>{t("test.fixFieldsBeforeSave", { count: formValidation.summary.length })}</p>
-                </div>
-              ) : null}
-
-              <footer className="test-definition-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary modal-action-btn"
-                  onClick={() => setFormOpen(false)}
-                >
-                  {t("test.cancel")}
-                </button>
-                <button type="submit" className="btn btn-primary modal-action-btn">
-                  {t("test.saveTest")}
-                </button>
-              </footer>
-            </form>
-          </div>
-        </div>
+        <TestDefinitionFormModal
+          t={t}
+          editingTestId={editingTestId}
+          formState={formState}
+          setFormState={setFormState}
+          saveDefinition={saveDefinition}
+          showErrors={showErrors}
+          formValidation={formValidation}
+          categoryOptions={categoryOptions}
+          subcategoryOptions={subcategoryOptions}
+          updateIncludedCategories={updateIncludedCategories}
+          titleInputRef={titleInputRef}
+          questionLimitInputRef={questionLimitInputRef}
+          categoriesTriggerRef={categoriesTriggerRef}
+          timeLimitInputRef={timeLimitInputRef}
+          penaltyInputRef={penaltyInputRef}
+          onCancel={() => setFormOpen(false)}
+        />
       ) : null}
 
-      {deleteTarget ? (
-        <div className="settings-modal-backdrop" role="presentation">
-          <div className="settings-modal" role="dialog" aria-modal="true">
-            <h3>{t("test.deleteTestConfirmTitle")}</h3>
-            <p>{t("test.deleteTestConfirmBody", { title: deleteTarget.title })}</p>
-            <div className="delete-test-confirm-actions">
-              <Button
-                onClick={() => {
-                  onDeleteDefinition(deleteTarget);
-                  setDeleteTarget(null);
-                }}
-              >
-                {t("settings.confirm")}
-              </Button>
-              <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
-                {t("test.cancel")}
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <DeleteTestDefinitionModal
+        t={t}
+        deleteTarget={deleteTarget}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          onDeleteDefinition(deleteTarget);
+          setDeleteTarget(null);
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
       {toast ? (
         <Toast
@@ -1271,23 +929,6 @@ export function TestSection({
           closeLabel={t("test.toastClose")}
         />
       ) : null}
-    </div>
-  );
-}
-
-function MetricLine({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className={className ? `metric-inline ${className}` : "metric-inline"}>
-      <span className="metric-inline-label">{label}</span>
-      <span className="metric-inline-value">{value}</span>
     </div>
   );
 }
@@ -1432,114 +1073,4 @@ function validateDefinitionForm(form: TestFormState, bankQuestions: CollectionQu
       "penaltyPerIncorrectAnswer",
     ] as const,
   };
-}
-
-function SearchableMultiSelect({
-  label,
-  placeholder,
-  options,
-  selected,
-  onChange,
-  selectedCountLabel,
-  clearLabel,
-  selectAllLabel,
-  onSelectAll,
-  closeLabel,
-  disabled,
-  disabledText,
-  error,
-  triggerRef,
-}: {
-  label: string;
-  placeholder: string;
-  options: string[];
-  selected: string[];
-  onChange: (next: string[]) => void;
-  selectedCountLabel: string;
-  clearLabel: string;
-  selectAllLabel?: string;
-  onSelectAll?: () => void;
-  closeLabel: string;
-  disabled?: boolean;
-  disabledText?: string;
-  error?: string;
-  triggerRef?: RefObject<HTMLButtonElement | null>;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const selectedValues = useMemo(() => new Set(selected), [selected]);
-  const filtered = useMemo(
-    () => options.filter((item) => item.toLowerCase().includes(query.toLowerCase())),
-    [options, query],
-  );
-
-  const toggleSelection = (value: string) => {
-    if (selected.includes(value)) {
-      onChange(selected.filter((item) => item !== value));
-      return;
-    }
-    onChange([...selected, value]);
-  };
-
-  return (
-    <div className="field multi-select-field">
-      <span>{label}</span>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="input multi-select-trigger"
-        disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
-        aria-expanded={open}
-      >
-        {selected.length > 0 ? selectedCountLabel : placeholder}
-      </button>
-
-      {open && !disabled ? (
-        <div className="multi-select-panel">
-          <input
-            className="input multi-select-search"
-            value={query}
-            placeholder={placeholder}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <div className="multi-select-options">
-            {filtered.map((option) => (
-              <label key={option} className="multi-select-option">
-                <input
-                  type="checkbox"
-                  checked={selectedValues.has(option)}
-                  onChange={() => toggleSelection(option)}
-                />
-                <span>{option}</span>
-              </label>
-            ))}
-          </div>
-          <div className="multi-select-actions">
-            <div className="multi-select-bulk-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => onChange([])}>
-                {clearLabel}
-              </button>
-              {selectAllLabel && onSelectAll ? (
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={onSelectAll}
-                  disabled={options.length === 0}
-                >
-                  {selectAllLabel}
-                </button>
-              ) : null}
-            </div>
-            <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>
-              {closeLabel}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {disabled && disabledText ? <small className="field-hint">{disabledText}</small> : null}
-      {error ? <small className="field-error">{error}</small> : null}
-    </div>
-  );
 }
