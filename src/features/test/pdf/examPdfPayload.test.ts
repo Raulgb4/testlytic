@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { QuestionCollection } from "../questionCollectionTypes";
 import { RuntimeQuestion, TestDefinition } from "../testTypes";
 import { buildExamPdfPayload } from "./examPdfPayload";
 import {
@@ -192,6 +193,66 @@ describe("exam PDF payload", () => {
     });
 
     expect(sourceQuestions).toEqual(runtimeQuestions);
+  });
+
+  it("does not mutate collection questions or analytics when building from collection data", () => {
+    const collection: QuestionCollection = {
+      version: "1",
+      importedAt: "2026-06-10T10:00:00.000Z",
+      summary: {
+        totalQuestions: 1,
+        totalCategories: 1,
+        totalSubcategories: 1,
+        totalSingleChoice: 1,
+        totalMultipleChoice: 0,
+        totalSources: 1,
+      },
+      questions: [
+        {
+          id: "collection-q1",
+          question: "Collection question",
+          questionType: "single_choice",
+          questionCategory: "Law",
+          questionSubcategory: "Security",
+          questionSource: "Source 1",
+          options: [
+            { id: "a", text: "Answer A" },
+            { id: "b", text: "Answer B" },
+          ],
+          correctOptions: ["a"],
+          shuffleOptions: true,
+          analytics: {
+            computedDifficulty: "medium",
+            userDeclaredDifficulty: "high",
+            timesAnsweredIncorrectly: 3,
+            timesAnsweredCorrectly: 7,
+            exposureCount: 11,
+          },
+        },
+      ],
+    };
+    const originalCollection = structuredClone(collection);
+    const collectionRuntimeQuestions: RuntimeQuestion[] = collection.questions.map((question) => ({
+      id: question.id,
+      question: question.question,
+      auxiliaryInformation: question.auxiliaryInformation,
+      questionType: question.questionType,
+      questionCategory: question.questionCategory,
+      questionSubcategory: question.questionSubcategory,
+      options: question.options,
+      correctOptions: question.correctOptions,
+      shuffleOptions: question.shuffleOptions,
+      correctAnswerExplanation: question.correctAnswerExplanation,
+    }));
+
+    buildExamPdfPayload({
+      definition,
+      runtimeQuestions: collectionRuntimeQuestions,
+      generatedAt: "2026-06-10T12:00:00.000Z",
+    });
+
+    expect(collection).toEqual(originalCollection);
+    expect(collection.questions[0].analytics).toEqual(originalCollection.questions[0].analytics);
   });
 
   it("builds safe PDF filenames", () => {

@@ -1591,7 +1591,11 @@ mod tests {
         ids
     }
 
-    fn generated_ids(conn: &Connection, definition: &TestDefinitionDto, seed: u64) -> Vec<String> {
+    fn generated_questions(
+        conn: &Connection,
+        definition: &TestDefinitionDto,
+        seed: u64,
+    ) -> Vec<CollectionQuestionDto> {
         let eligible = load_eligible_questions(conn, definition).unwrap();
         let now = chrono::DateTime::parse_from_rfc3339("2026-06-11T12:00:00Z")
             .unwrap()
@@ -1601,9 +1605,13 @@ mod tests {
             definition.question_limit,
             seed,
         )
-        .into_iter()
-        .map(|question| question.id)
-        .collect()
+    }
+
+    fn generated_ids(conn: &Connection, definition: &TestDefinitionDto, seed: u64) -> Vec<String> {
+        generated_questions(conn, definition, seed)
+            .into_iter()
+            .map(|question| question.id)
+            .collect()
     }
 
     fn insert_completed_attempt(conn: &Connection, attempt_id: &str) {
@@ -1893,6 +1901,25 @@ mod tests {
     }
 
     #[test]
+    fn category_only_filter_includes_questions_with_missing_subcategory() {
+        let conn = setup_filter_bank();
+        let ids = eligible_ids(&conn, &test_definition(vec!["T1"], None, 10));
+
+        assert!(ids.contains(&"t1-none".into()));
+    }
+
+    #[test]
+    fn subcategory_filter_excludes_questions_with_missing_subcategory() {
+        let conn = setup_filter_bank();
+        let ids = eligible_ids(
+            &conn,
+            &test_definition(vec!["T1"], Some(vec!["A1.2019"]), 10),
+        );
+
+        assert_eq!(ids, vec!["t1-a1"]);
+    }
+
+    #[test]
     fn load_eligible_questions_regresses_t1_a1_without_cross_filter_leaks() {
         let conn = Connection::open_in_memory().unwrap();
         initialize_db(&conn).unwrap();
@@ -1922,6 +1949,106 @@ mod tests {
         assert_eq!(ids.len(), 2);
         assert_eq!(unique_ids.len(), ids.len());
         assert!(ids.iter().all(|id| id == "t1-a1" || id == "t2-a1"));
+    }
+
+    #[test]
+    fn generated_questions_return_all_eligible_when_limit_exceeds_bank_without_duplicates() {
+        let conn = setup_filter_bank();
+        let definition = test_definition(vec!["T1", "T2"], Some(vec!["A1.2019"]), 10);
+        let ids = generated_ids(&conn, &definition, 43);
+        let unique_ids = ids.iter().collect::<std::collections::HashSet<_>>();
+
+        assert_eq!(ids.len(), 2);
+        assert_eq!(unique_ids.len(), 2);
+        assert!(ids.iter().all(|id| id == "t1-a1" || id == "t2-a1"));
+    }
+
+    #[test]
+    fn saved_definition_includes_newly_imported_matching_questions() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        insert_question(
+            &conn,
+            &test_question_with_filter("existing", "unrated", "T1", Some("A1")),
+            None,
+        )
+        .unwrap();
+        let definition = TestDefinitionDto {
+            id: "saved-t1-a1".into(),
+            ..test_definition(vec!["T1"], Some(vec!["A1"]), 10)
+        };
+        save_test_definition_to_conn(&mut conn, &definition).unwrap();
+
+        insert_question(
+            &conn,
+            &test_question_with_filter("new-match", "unrated", "T1", Some("A1")),
+            None,
+        )
+        .unwrap();
+        let loaded = load_test_definitions_from_conn(&conn).unwrap();
+        let ids = generated_ids(&conn, &loaded[0], 44);
+
+        assert!(ids.contains(&"existing".into()));
+        assert!(ids.contains(&"new-match".into()));
+    }
+
+    #[test]
+    fn saved_definition_ignores_newly_imported_out_of_filter_questions() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        insert_question(
+            &conn,
+            &test_question_with_filter("existing", "unrated", "T1", Some("A1")),
+            None,
+        )
+        .unwrap();
+        let definition = TestDefinitionDto {
+            id: "saved-t1-a1".into(),
+            ..test_definition(vec!["T1"], Some(vec!["A1"]), 10)
+        };
+        save_test_definition_to_conn(&mut conn, &definition).unwrap();
+
+        for question in [
+            test_question_with_filter("wrong-category", "unrated", "T2", Some("A1")),
+            test_question_with_filter("wrong-subcategory", "unrated", "T1", Some("A2")),
+        ] {
+            insert_question(&conn, &question, None).unwrap();
+        }
+        let loaded = load_test_definitions_from_conn(&conn).unwrap();
+        let ids = generated_ids(&conn, &loaded[0], 45);
+
+        assert_eq!(ids, vec!["existing"]);
+    }
+
+    #[test]
+    fn large_bank_generation_respects_filters_limit_and_uniqueness() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        for category_index in 1..=6 {
+            for subcategory_index in 1..=5 {
+                for question_index in 1..=12 {
+                    let id = format!("t{category_index}-a{subcategory_index}-{question_index}");
+                    let category = format!("T{category_index}");
+                    let subcategory = format!("A{subcategory_index}");
+                    insert_question(
+                        &conn,
+                        &test_question_with_filter(&id, "unrated", &category, Some(&subcategory)),
+                        None,
+                    )
+                    .unwrap();
+                }
+            }
+        }
+
+        let definition = test_definition(vec!["T2", "T4"], Some(vec!["A3"]), 20);
+        let ids = generated_ids(&conn, &definition, 46);
+        let unique_ids = ids.iter().collect::<std::collections::HashSet<_>>();
+
+        assert_eq!(ids.len(), 20);
+        assert_eq!(unique_ids.len(), 20);
+        assert!(ids
+            .iter()
+            .all(|id| id.starts_with("t2-a3-") || id.starts_with("t4-a3-")));
     }
 
     #[test]
@@ -2185,6 +2312,56 @@ mod tests {
     }
 
     #[test]
+    fn score_questions_ranks_low_exposure_seen_above_high_exposure_seen_when_controlled() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-06-07T12:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let questions = score_questions(
+            vec![
+                scored(
+                    "high-exposure",
+                    "unrated",
+                    test_stats(8, 8, 8, 0, Some("2026-05-01T12:00:00Z")),
+                ),
+                scored(
+                    "low-exposure",
+                    "unrated",
+                    test_stats(2, 2, 2, 0, Some("2026-05-01T12:00:00Z")),
+                ),
+            ],
+            now,
+        );
+
+        assert_eq!(questions.first().unwrap().question.id, "low-exposure");
+        assert!(questions[0].score > questions[1].score);
+    }
+
+    #[test]
+    fn score_questions_penalizes_recent_high_exposure_against_stale_low_exposure() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-06-07T12:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let questions = score_questions(
+            vec![
+                scored(
+                    "recent-high-exposure",
+                    "unrated",
+                    test_stats(8, 8, 8, 0, Some("2026-06-07T06:00:00Z")),
+                ),
+                scored(
+                    "stale-low-exposure",
+                    "unrated",
+                    test_stats(2, 2, 2, 0, Some("2026-04-01T12:00:00Z")),
+                ),
+            ],
+            now,
+        );
+
+        assert_eq!(questions.first().unwrap().question.id, "stale-low-exposure");
+        assert!(questions[0].score > questions[1].score);
+    }
+
+    #[test]
     fn weighted_selection_respects_limit_and_avoids_duplicates() {
         let now = chrono::DateTime::parse_from_rfc3339("2026-06-07T12:00:00Z")
             .unwrap()
@@ -2205,6 +2382,46 @@ mod tests {
 
         assert_eq!(selected.len(), 2);
         assert_eq!(ids.len(), 2);
+    }
+
+    #[test]
+    fn weighted_selection_returns_empty_for_zero_and_negative_limits() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-06-07T12:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let scored_questions = score_questions(
+            vec![
+                scored("q1", "unrated", test_stats(0, 0, 0, 0, None)),
+                scored("q2", "unrated", test_stats(0, 0, 0, 0, None)),
+            ],
+            now,
+        );
+
+        assert!(weighted_select_questions(scored_questions.clone(), 0, 47).is_empty());
+        assert!(weighted_select_questions(scored_questions, -1, 48).is_empty());
+    }
+
+    #[test]
+    fn weighted_selection_returns_all_candidates_when_limit_exceeds_bank_without_duplicates() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-06-07T12:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let scored_questions = score_questions(
+            vec![
+                scored("q1", "unrated", test_stats(0, 0, 0, 0, None)),
+                scored("q2", "unrated", test_stats(0, 0, 0, 0, None)),
+                scored("q3", "unrated", test_stats(0, 0, 0, 0, None)),
+            ],
+            now,
+        );
+        let selected = weighted_select_questions(scored_questions, 10, 49);
+        let ids = selected
+            .iter()
+            .map(|question| question.id.clone())
+            .collect::<std::collections::HashSet<_>>();
+
+        assert_eq!(selected.len(), 3);
+        assert_eq!(ids.len(), 3);
     }
 
     #[test]
@@ -2233,6 +2450,53 @@ mod tests {
         assert!(ids.contains("unseen-1"));
         assert!(ids.contains("unseen-2"));
         assert!(!ids.contains("seen-hard"));
+    }
+
+    #[test]
+    fn completed_generation_cycles_eventually_expose_all_eligible_questions() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_db(&conn).unwrap();
+        for index in 1..=12 {
+            insert_question(
+                &conn,
+                &test_question_with_filter(&format!("q{index}"), "unrated", "T1", Some("A1")),
+                None,
+            )
+            .unwrap();
+        }
+        let definition = test_definition(vec!["T1"], Some(vec!["A1"]), 3);
+
+        for cycle in 0..8 {
+            let questions = generated_questions(&conn, &definition, 100 + cycle);
+            let answers = questions
+                .into_iter()
+                .map(|question| answer_snapshot(question, 0))
+                .collect::<Vec<_>>();
+            let mut attempt = completed_attempt(&format!("attempt-{cycle}"), "test-1");
+            attempt.total_questions = answers.len() as i64;
+            attempt.correct_answers = answers.len() as i64;
+            attempt.raw_score = answers.len() as f64;
+            attempt.final_score = answers.len() as f64;
+            attempt.category_results = vec![CategoryAttemptResultDto {
+                category: "T1".into(),
+                correct: answers.len() as i64,
+                incorrect: 0,
+                unanswered: 0,
+                total: answers.len() as i64,
+                accuracy_percentage: 100.0,
+            }];
+            save_completed_attempt_to_conn(
+                &mut conn,
+                &SaveCompletedAttemptRequest { attempt, answers },
+            )
+            .unwrap();
+        }
+
+        let exposure_counts = (1..=12)
+            .map(|index| stats(&conn, &format!("q{index}")).exposure_count)
+            .collect::<Vec<_>>();
+
+        assert!(exposure_counts.iter().all(|count| *count > 0));
     }
 
     #[test]
